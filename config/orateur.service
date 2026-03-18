@@ -1,0 +1,13 @@
+[Unit]
+Description=Orateur speech-to-text
+After=graphical-session.target pipewire.service
+Wants=pipewire.service
+
+[Service]
+Type=simple
+ExecStart={{EXEC_START}}
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

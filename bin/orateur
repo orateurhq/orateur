@@ -1,0 +1,97 @@
+#!/bin/bash
+
+# orateur launcher
+# Uses fixed venv (~/.local/share/orateur/venv) for GPU-accelerated pywhispercpp.
+# In development (project has .venv), uses project venv. Sets LD_LIBRARY_PATH for CUDA/ROCm.
+
+SCRIPT_DIR="$(cd "$(dirname $(readlink -f "$0"))" && pwd)"
+PACKAGE_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Determine the library directory
+# Development: src/orateur/cli.py exists under PACKAGE_ROOT
+# Installed: lib/orateur/cli.py under PACKAGE_ROOT (e.g., /usr/lib/orateur/)
+if [ -f "$PACKAGE_ROOT/src/orateur/cli.py" ]; then
+    LIB_DIR="$PACKAGE_ROOT/src/orateur"
+    SRC_PARENT="$PACKAGE_ROOT/src"
+elif [ -f "$PACKAGE_ROOT/lib/orateur/cli.py" ]; then
+    LIB_DIR="$PACKAGE_ROOT/lib/orateur"
+    SRC_PARENT="$PACKAGE_ROOT/lib"
+else
+    echo "Error: Cannot find orateur library files." >&2
+    echo "Searched in:" >&2
+    echo "  $PACKAGE_ROOT/src/orateur/cli.py" >&2
+    echo "  $PACKAGE_ROOT/lib/orateur/cli.py" >&2
+    exit 1
+fi
+
+export ORATEUR_ROOT="$PACKAGE_ROOT"
+export PYTHONPATH="${SRC_PARENT}:${PYTHONPATH}"
+
+# Find system Python (for setup when venv doesn't exist)
+get_system_python() {
+    local system_path="/usr/bin:/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/sbin"
+    local py
+    py="$(PATH="$system_path" command -v python3 2>/dev/null)" && [ -x "$py" ] && { echo "$py"; return 0; }
+    py="$(PATH="$system_path" command -v python 2>/dev/null)" && [ -x "$py" ] && { echo "$py"; return 0; }
+    return 1
+}
+
+CLI_PYTHON="$(get_system_python)"
+
+# Use fixed venv so run uses same venv as setup (CUDA build).
+# Project .venv from uv sync has CPU wheel; setup installs CUDA into fixed venv.
+VENV_PYTHON="${XDG_DATA_HOME:-$HOME/.local/share}/orateur/venv/bin/python"
+if [ -f "$VENV_PYTHON" ]; then
+    PYTHON_CMD="$VENV_PYTHON"
+elif [ -f "$PACKAGE_ROOT/.venv/bin/python" ]; then
+    PYTHON_CMD="$PACKAGE_ROOT/.venv/bin/python"
+else
+    PYTHON_CMD="${CLI_PYTHON:-}"
+fi
+
+if [[ -z "$PYTHON_CMD" || ! -x "$PYTHON_CMD" ]]; then
+    echo "Error: No Python found. Run 'orateur setup' first, or ensure system Python is installed." >&2
+    exit 1
+fi
+
+# Help handling
+for arg in "$@"; do
+  if [[ "$arg" == "-h" || "$arg" == "--help" ]]; then
+    exec "$PYTHON_CMD" -m orateur.cli --help
+  fi
+done
+
+if [[ "$1" == "help" ]]; then
+  exec "$PYTHON_CMD" -m orateur.cli --help
+fi
+
+# setup: run with system Python if venv doesn't exist yet (creates it)
+# Otherwise use venv Python
+if [[ "$1" == "setup" ]]; then
+  if [ -f "$VENV_PYTHON" ] || [ -f "$PACKAGE_ROOT/.venv/bin/python" ]; then
+    exec "$PYTHON_CMD" -m orateur.cli "$@"
+  elif [[ -n "$CLI_PYTHON" ]]; then
+    exec "$CLI_PYTHON" -m orateur.cli "$@"
+  else
+    echo "Error: System Python not found. Install Python via your package manager." >&2
+    exit 1
+  fi
+fi
+
+# Set up CUDA/ROCm library path - required for pywhispercpp GPU
+if [ -d "/opt/cuda" ]; then
+  CUDA_LIB_DIRS=""
+  [ -d "/opt/cuda/targets/x86_64-linux/lib" ] && CUDA_LIB_DIRS="/opt/cuda/targets/x86_64-linux/lib"
+  [ -d "/opt/cuda/lib" ] && CUDA_LIB_DIRS="${CUDA_LIB_DIRS:+$CUDA_LIB_DIRS:}/opt/cuda/lib"
+  [ -d "/opt/cuda/lib64" ] && CUDA_LIB_DIRS="${CUDA_LIB_DIRS:+$CUDA_LIB_DIRS:}/opt/cuda/lib64"
+  [ -n "$CUDA_LIB_DIRS" ] && export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+$LD_LIBRARY_PATH:}${CUDA_LIB_DIRS}"
+fi
+if [ -d "/opt/rocm" ]; then
+  ROCM_LIB_DIRS=""
+  [ -d "/opt/rocm/lib" ] && ROCM_LIB_DIRS="/opt/rocm/lib"
+  [ -d "/opt/rocm/lib64" ] && ROCM_LIB_DIRS="${ROCM_LIB_DIRS:+$ROCM_LIB_DIRS:}/opt/rocm/lib64"
+  [ -n "$ROCM_LIB_DIRS" ] && export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+$LD_LIBRARY_PATH:}${ROCM_LIB_DIRS}"
+fi
+
+# Default and heavy commands: run main app with venv Python
+exec "$PYTHON_CMD" -m orateur.cli "$@"
