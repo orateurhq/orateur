@@ -1,6 +1,6 @@
 # Orateur
 
-Minimal local speech-to-text, text-to-speech and speech-to-speech.
+Minimal python local speech-to-text, text-to-speech and speech-to-speech assistant.
 
 ## Features
 
@@ -84,6 +84,32 @@ Config: `~/.config/orateur/config.json`
 orateur config init
 orateur config show
 ```
+
+### MCP servers (Cursor-style)
+
+Define MCP servers in `mcpServers`. The LLM has access to all of them: one must expose `llm_generate` for STS, and tools from every server are aggregated for the LLM to use.
+
+```json
+{
+  "mcpServers": {
+    "weather-forecast": {
+      "command": "uvx",
+      "args": ["weather-forecast-server"]
+    },
+    "my-llm": {
+      "command": "uvx",
+      "args": ["my-mcp-llm-package"]
+    }
+  },
+  "llm_backend": "mcp"
+}
+```
+
+- **mcpServers**: Named servers with `command` and `args` (Cursor-compatible)
+- One server must expose `llm_generate` or `llm_chat` for STS
+- Tools from all servers are passed to the LLM
+
+List configured servers with `orateur mcp list`.
 
 ## Stopping
 

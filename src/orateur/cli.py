@@ -5,8 +5,13 @@
 # bundled libs. Editable install (setup --build-from-source) uses system CUDA.
 # from . import _cuda_env  # noqa: F401
 
+# Configure logging before any other orateur imports
+from . import log
+log.setup_logging()
+
 import argparse
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -14,7 +19,9 @@ import threading
 from pathlib import Path
 
 from .config import ConfigManager
-from .paths import CONFIG_DIR, CONFIG_FILE, MCP_SERVERS_FILE
+
+log = logging.getLogger(__name__)
+from .paths import CONFIG_DIR, CONFIG_FILE
 from .stt import get_stt_backend, list_stt_backends
 from .tts import get_tts_backend, list_tts_backends
 from .llm import get_llm_backend, list_llm_backends
@@ -36,11 +43,11 @@ def cmd_speak(args):
     if not text:
         text = _get_text_from_selection(config)
     if not text:
-        print("No text to speak")
+        log.error("No text to speak")
         return 1
     tts = get_tts_backend(config.get_setting("tts_backend", "pocket_tts"), config)
     if not tts or not tts.is_ready():
-        print("TTS not ready")
+        log.error("TTS not ready")
         return 1
     tts.synthesize_and_play(text)
     return 0
@@ -51,10 +58,10 @@ def cmd_transcribe(args):
     config = ConfigManager()
     stt = get_stt_backend(config.get_setting("stt_backend", "pywhispercpp"), config)
     if not stt or not stt.is_ready():
-        print("STT not ready")
+        log.error("STT not ready")
         return 1
     audio = AudioCapture(config=config)
-    print("Recording... (Ctrl+C to stop)")
+    log.info("Recording... (Ctrl+C to stop)")
     try:
         audio.start_recording()
         while True:
@@ -62,7 +69,7 @@ def cmd_transcribe(args):
             time.sleep(0.5)
     except KeyboardInterrupt:
         pass
-    print("Stopping...", flush=True)
+    log.info("Stopping...")
     # Run stop_recording in a thread so main thread stays responsive to Ctrl+C
     result: list = []
     def _run_stop():
@@ -76,22 +83,22 @@ def cmd_transcribe(args):
         while worker.is_alive():
             worker.join(timeout=0.2)
     except KeyboardInterrupt:
-        print("\nStopping... (please wait)", flush=True)
+        log.info("Stopping... (please wait)")
         worker.join(timeout=5.0)
     data = result[0] if result else None
     if isinstance(data, BaseException):
         raise data
     if data is None:
-        print("No audio")
+        log.error("No audio")
         return 1
-    print("Transcribing...", flush=True)
+    log.info("Transcribing...")
     text = stt.transcribe(data)
     if not text or not text.strip():
-        print("No transcription")
+        log.error("No transcription")
         return 1
     injector = TextInjector(config)
     if not injector.inject_text(text):
-        print("[WARN] Could not paste - text copied to clipboard", flush=True)
+        log.warning("Could not paste - text copied to clipboard")
     print(text)
     return 0
 
@@ -103,10 +110,10 @@ def cmd_sts(args):
     tts = get_tts_backend(config.get_setting("tts_backend", "pocket_tts"), config)
     llm = get_llm_backend(config.get_setting("llm_backend", "ollama"), config)
     if not all([stt and stt.is_ready(), tts and tts.is_ready(), llm and llm.is_ready()]):
-        print("STT, TTS, or LLM not ready")
+        log.error("STT, TTS, or LLM not ready")
         return 1
     audio = AudioCapture(config=config)
-    print("Recording for STS... (Ctrl+C to stop)")
+    log.info("Recording for STS... (Ctrl+C to stop)")
     try:
         audio.start_recording()
         while True:
@@ -114,7 +121,7 @@ def cmd_sts(args):
             time.sleep(0.5)
     except KeyboardInterrupt:
         pass
-    print("Stopping...", flush=True)
+    log.info("Stopping...")
     result: list = []
     def _run_stop():
         try:
@@ -127,13 +134,13 @@ def cmd_sts(args):
         while worker.is_alive():
             worker.join(timeout=0.2)
     except KeyboardInterrupt:
-        print("\nStopping... (please wait)", flush=True)
+        log.info("Stopping... (please wait)")
         worker.join(timeout=5.0)
     data = result[0] if result else None
     if isinstance(data, BaseException):
         raise data
     if data is None:
-        print("No audio")
+        log.error("No audio")
         return 1
     run_sts(config, data, stt=stt, tts=tts, llm=llm)
     return 0
@@ -230,12 +237,19 @@ def cmd_model_list(args):
 
 
 def cmd_mcp_list(args):
-    if not MCP_SERVERS_FILE.exists():
-        print("No MCP servers configured")
+    config = ConfigManager()
+    servers = config.get_setting("mcpServers") or {}
+    if not servers:
+        print("No MCP servers configured (add mcpServers to config.json)")
         return 0
-    data = json.loads(MCP_SERVERS_FILE.read_text())
-    for name, cfg in data.items():
-        print(f"  {name}: {cfg.get('description', cfg)}")
+    for name, cfg in servers.items():
+        if isinstance(cfg, dict):
+            cmd = cfg.get("command", "?")
+            args = cfg.get("args", [])
+            args_str = " ".join(str(a) for a in args) if args else ""
+            print(f"  {name}: {cmd} {args_str}".strip())
+        else:
+            print(f"  {name}: {cfg}")
     return 0
 
 

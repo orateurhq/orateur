@@ -1,21 +1,19 @@
 """Pocket TTS backend."""
 
+import logging
 import subprocess
-import sys
 import time
 from pathlib import Path
 from typing import Optional
 
 from .base import TTSBackend
 
+log = logging.getLogger(__name__)
+
 POCKET_TTS_VOICES = [
     "alba", "marius", "javert", "jean", "fantine",
     "cosette", "eponine", "azelma",
 ]
-
-
-def _log(msg: str) -> None:
-    print(f"[TTS] {msg}", file=sys.stderr, flush=True)
 
 
 class PocketTTSBackend(TTSBackend):
@@ -37,13 +35,13 @@ class PocketTTSBackend(TTSBackend):
             from pocket_tts import TTSModel
             self._model = TTSModel.load_model()
             self.ready = True
-            _log(f"Pocket TTS ready - voice: {self.voice}")
+            log.info("Pocket TTS ready - voice: %s", self.voice)
             return True
         except ImportError as e:
-            _log(f"pocket-tts not installed: {e}")
+            log.warning("pocket-tts not installed: %s", e)
             return False
         except Exception as e:
-            _log(f"Pocket TTS init failed: {e}")
+            log.warning("Pocket TTS init failed: %s", e)
             return False
 
     def _get_voice_state(self, voice: Optional[str] = None):
@@ -89,7 +87,7 @@ class PocketTTSBackend(TTSBackend):
             scipy.io.wavfile.write(str(out_path), self._model.sample_rate, arr)
             return out_path
         except Exception as e:
-            _log(f"Synthesis failed: {e}")
+            log.warning("Synthesis failed: %s", e)
             return None
 
     def synthesize_and_play(
@@ -131,7 +129,7 @@ class PocketTTSBackend(TTSBackend):
             time.sleep(0.5)
             return proc.returncode == 0
         except Exception as e:
-            _log(f"Streaming failed: {e}")
+            log.warning("Streaming failed: %s", e)
             wav = self.synthesize(text, voice)
             return wav and self._play_file(wav, vol)
 

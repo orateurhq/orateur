@@ -2,12 +2,15 @@
 
 from . import _cuda_env  # noqa: F401 - sets LD_LIBRARY_PATH for CUDA/ROCm
 
+import logging
 import os
 import signal
 import sys
 import time
 
 from .audio_capture import AudioCapture
+
+log = logging.getLogger(__name__)
 from .stt import get_stt_backend
 from .tts import get_tts_backend
 from .llm import get_llm_backend
@@ -38,21 +41,21 @@ def run(config: ConfigManager | None = None) -> None:
     """Run the main loop (used by systemd)."""
     config = config or ConfigManager()
 
-    print("[INIT] Loading STT...")
+    log.info("Loading STT...")
     stt = get_stt_backend(config.get_setting("stt_backend", "pywhispercpp"), config)
     if not stt or not stt.is_ready():
-        print("[ERROR] STT failed to initialize")
+        log.error("STT failed to initialize")
         sys.exit(1)
 
-    print("[INIT] Loading TTS...")
+    log.info("Loading TTS...")
     tts = get_tts_backend(config.get_setting("tts_backend", "pocket_tts"), config)
     if not tts or not tts.is_ready():
-        print("[WARN] TTS not ready - speak/sts will be limited")
+        log.warning("TTS not ready - speak/sts will be limited")
 
-    print("[INIT] Loading LLM...")
+    log.info("Loading LLM...")
     llm = get_llm_backend(config.get_setting("llm_backend", "ollama"), config)
     if not llm or not llm.is_ready():
-        print("[WARN] LLM not ready - sts will be limited")
+        log.warning("LLM not ready - sts will be limited")
 
     audio = AudioCapture(config=config)
     injector = TextInjector(config)
@@ -109,7 +112,7 @@ def run(config: ConfigManager | None = None) -> None:
     if not shortcuts.start():
         sys.exit(1)
 
-    print("[INIT] Orateur ready. Shortcuts active.")
+    log.info("Orateur ready. Shortcuts active.")
 
     shutdown_requested = [False]
 
@@ -127,7 +130,7 @@ def run(config: ConfigManager | None = None) -> None:
     except KeyboardInterrupt:
         pass
     finally:
-        print("[INIT] Shutting down...")
+        log.info("Shutting down...")
         shortcuts.stop()
         # Bypass Python interpreter shutdown to avoid C++ destructor crashes
         # (pywhispercpp/ggml and PyTorch can crash when daemon threads are

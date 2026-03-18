@@ -1,10 +1,13 @@
 """Audio capture for speech recognition."""
 
+import logging
 import threading
 from typing import Optional
 
 import numpy as np
 import sounddevice as sd
+
+log = logging.getLogger(__name__)
 
 
 class AudioCapture:
@@ -61,7 +64,7 @@ class AudioCapture:
             self.record_thread.start()
             return True
         except Exception as e:
-            print(f"[AUDIO] Failed to start: {e}")
+            log.error("Failed to start: %s", e)
             with self.lock:
                 self.is_recording = False
             return False
@@ -88,7 +91,7 @@ class AudioCapture:
                         audio = np.ascontiguousarray(audio, dtype=np.float32)
                     return audio
                 except Exception as e:
-                    print(f"[AUDIO] Failed to process: {e}")
+                    log.error("Failed to process: %s", e)
                     return None
                 finally:
                     self.lock.release()
@@ -99,7 +102,7 @@ class AudioCapture:
         try:
             def callback(indata, frames, time_info, status):
                 if status:
-                    print(f"[AUDIO] {status}")
+                    log.warning("Audio status: %s", status)
                 with self.lock:
                     if self.is_recording:
                         chunk = indata[:, 0].copy()
@@ -119,7 +122,7 @@ class AudioCapture:
                         break
                 sd.sleep(100)
         except Exception as e:
-            print(f"[AUDIO] Record error: {e}")
+            log.error("Record error: %s", e)
         finally:
             stream_to_close = None
             with self.lock:

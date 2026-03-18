@@ -9,6 +9,7 @@ When run via the launcher (installed users): installs into ~/.local/share/orateu
 When run via uv run (development): installs into project .venv.
 """
 
+import logging
 import os
 import platform
 import re
@@ -19,6 +20,8 @@ from pathlib import Path
 from typing import Optional
 
 from .paths import VENV_DIR, PYWHISPERCPP_SRC_DIR
+
+log = logging.getLogger(__name__)
 
 
 def _detect_cuda_version() -> Optional[str]:
@@ -101,12 +104,12 @@ def _build_pywhispercpp_cuda_from_source() -> bool:
     """
     compute_cap = _detect_compute_capability()
     if not compute_cap:
-        print("[setup] Could not detect GPU compute capability (nvidia-smi --query-gpu=compute_cap)")
+        log.error("Could not detect GPU compute capability (nvidia-smi --query-gpu=compute_cap)")
         return False
 
-    print(f"[setup] Building pywhispercpp from source with CUDA (arch=sm_{compute_cap})...")
-    print("[setup] Editable install links to system CUDA (avoids bundled lib conflicts).")
-    print("[setup] This may take several minutes.")
+    log.info("Building pywhispercpp from source with CUDA (arch=sm_%s)...", compute_cap)
+    log.info("Editable install links to system CUDA (avoids bundled lib conflicts).")
+    log.info("This may take several minutes.")
 
     pip_bin = _get_pip_bin()
     if not pip_bin:
@@ -126,7 +129,7 @@ def _build_pywhispercpp_cuda_from_source() -> bool:
 
     # Clone or update pywhispercpp sources
     if not PYWHISPERCPP_SRC_DIR.exists() or not (PYWHISPERCPP_SRC_DIR / ".git").exists():
-        print(f"[setup] Cloning pywhispercpp → {PYWHISPERCPP_SRC_DIR}")
+        log.info("Cloning pywhispercpp → %s", PYWHISPERCPP_SRC_DIR)
         PYWHISPERCPP_SRC_DIR.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run(
             ["git", "clone", "--recurse-submodules",
@@ -135,7 +138,7 @@ def _build_pywhispercpp_cuda_from_source() -> bool:
             timeout=120,
         )
     else:
-        print(f"[setup] Updating pywhispercpp in {PYWHISPERCPP_SRC_DIR}")
+        log.info("Updating pywhispercpp in %s", PYWHISPERCPP_SRC_DIR)
         subprocess.run(["git", "-C", str(PYWHISPERCPP_SRC_DIR), "fetch", "--tags"], capture_output=True, timeout=30)
         subprocess.run(["git", "-C", str(PYWHISPERCPP_SRC_DIR), "submodule", "update", "--init", "--recursive"], check=True, timeout=60)
 
@@ -147,14 +150,14 @@ def _build_pywhispercpp_cuda_from_source() -> bool:
             timeout=600,
         )
         if result.returncode == 0:
-            print("[setup] pywhispercpp (CUDA) built and installed successfully")
+            log.info("pywhispercpp (CUDA) built and installed successfully")
             return True
         return False
     except subprocess.TimeoutExpired:
-        print("[setup] Build timed out")
+        log.error("Build timed out")
         return False
     except Exception as e:
-        print(f"[setup] Build failed: {e}")
+        log.error("Build failed: %s", e)
         return False
 
 
@@ -170,12 +173,12 @@ def install_pywhispercpp(backend: Optional[str] = None) -> bool:
     if backend == "nvidia":
         cuda_version = _detect_cuda_version()
         if not cuda_version:
-            print("[setup] NVIDIA backend requested but no CUDA detected")
+            log.error("NVIDIA backend requested but no CUDA detected")
             return False
         if not _is_linux_x86_64():
-            print("[setup] CUDA build from source only supported on Linux x86_64. Using PyPI (CPU).")
+            log.warning("CUDA build from source only supported on Linux x86_64. Using PyPI (CPU).")
             return _install_from_pypi()
-        print(f"[setup] Detected CUDA {cuda_version} -> building from source...")
+        log.info("Detected CUDA %s -> building from source...", cuda_version)
         return _build_pywhispercpp_cuda_from_source()
 
     # Auto-detect
@@ -183,9 +186,9 @@ def install_pywhispercpp(backend: Optional[str] = None) -> bool:
     if not cuda_version:
         return _install_from_pypi()
     if not _is_linux_x86_64():
-        print("[setup] CUDA build only on Linux x86_64. Using PyPI (CPU).")
+        log.warning("CUDA build only on Linux x86_64. Using PyPI (CPU).")
         return _install_from_pypi()
-    print(f"[setup] Detected CUDA {cuda_version} -> building from source...")
+    log.info("Detected CUDA %s -> building from source...", cuda_version)
     return _build_pywhispercpp_cuda_from_source()
 
 
@@ -217,23 +220,23 @@ def _get_pip_bin() -> Optional[Path]:
     # System Python: ensure fixed venv exists
     venv_python = VENV_DIR / "bin" / "python"
     if not venv_python.exists():
-        print("[setup] Creating venv at", VENV_DIR)
+        log.info("Creating venv at %s", VENV_DIR)
         VENV_DIR.parent.mkdir(parents=True, exist_ok=True)
         py = sys.executable
         try:
             subprocess.run([py, "-m", "venv", str(VENV_DIR)], check=True, timeout=60)
         except subprocess.CalledProcessError as e:
-            print(f"[setup] Failed to create venv: {e}")
+            log.error("Failed to create venv: %s", e)
             return None
         except subprocess.TimeoutExpired:
-            print("[setup] Venv creation timed out")
+            log.error("Venv creation timed out")
             return None
 
         # Install orateur and deps into the new venv
         project_root = _project_root()
         pyproject = project_root / "pyproject.toml"
         if pyproject.exists():
-            print("[setup] Installing orateur and dependencies...")
+            log.info("Installing orateur and dependencies...")
             pip_bin = VENV_DIR / "bin" / "pip"
             try:
                 subprocess.run(
@@ -242,10 +245,10 @@ def _get_pip_bin() -> Optional[Path]:
                     timeout=300,
                 )
             except subprocess.CalledProcessError as e:
-                print(f"[setup] Failed to install orateur: {e}")
+                log.error("Failed to install orateur: %s", e)
                 return None
             except subprocess.TimeoutExpired:
-                print("[setup] Install timed out")
+                log.error("Install timed out")
                 return None
 
     pip_bin = VENV_DIR / "bin" / "pip"
@@ -256,23 +259,23 @@ def _run_venv_pip(args: list[str]) -> bool:
     """Run pip install in the target venv (fixed venv or current venv)."""
     pip_bin = _get_pip_bin()
     if not pip_bin:
-        print("[setup] No pip found. Run from project with uv: uv run orateur setup")
+        log.error("No pip found. Run from project with uv: uv run orateur setup")
         return False
     cmd = [str(pip_bin), "install", "--force-reinstall"] + args
     try:
         result = subprocess.run(cmd, timeout=120)
         return result.returncode == 0
     except subprocess.TimeoutExpired:
-        print("[setup] Install timed out")
+        log.error("Install timed out")
         return False
     except Exception as e:
-        print(f"[setup] Install failed: {e}")
+        log.error("Install failed: %s", e)
         return False
 
 
 def _install_from_pypi() -> bool:
     """Install pywhispercpp from PyPI (CPU)."""
     if _run_venv_pip(["pywhispercpp>=1.4.0"]):
-        print("[setup] pywhispercpp (CPU) installed from PyPI")
+        log.info("pywhispercpp (CPU) installed from PyPI")
         return True
     return False

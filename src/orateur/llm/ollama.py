@@ -1,13 +1,11 @@
 """Ollama LLM backend."""
 
-import sys
+import logging
 from typing import Optional
 
 from .base import LLMBackend
 
-
-def _log(msg: str) -> None:
-    print(f"[LLM] {msg}", file=sys.stderr, flush=True)
+log = logging.getLogger(__name__)
 
 
 class OllamaBackend(LLMBackend):
@@ -24,13 +22,13 @@ class OllamaBackend(LLMBackend):
             # Test connection
             ollama.list()
             self.ready = True
-            _log("Ollama ready")
+            log.info("Ollama ready")
             return True
         except ImportError as e:
-            _log(f"ollama not installed: {e}")
+            log.warning("ollama not installed: %s", e)
             return False
         except Exception as e:
-            _log(f"Ollama init failed (is ollama running?): {e}")
+            log.warning("Ollama init failed (is ollama running?): %s", e)
             return False
 
     def generate(
@@ -59,7 +57,7 @@ class OllamaBackend(LLMBackend):
                 return (response.message.content or "").strip()
             return ""
         except Exception as e:
-            _log(f"Ollama generate failed: {e}")
+            log.warning("Ollama generate failed: %s", e)
             return ""
 
     def is_ready(self) -> bool:

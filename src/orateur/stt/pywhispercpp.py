@@ -1,5 +1,6 @@
 """pywhispercpp STT backend."""
 
+import logging
 import sys
 from pathlib import Path
 from typing import Optional
@@ -7,6 +8,8 @@ from typing import Optional
 import numpy as np
 
 from .base import STTBackend
+
+log = logging.getLogger(__name__)
 
 
 class PyWhisperCppBackend(STTBackend):
@@ -28,8 +31,8 @@ class PyWhisperCppBackend(STTBackend):
         if not model_file.exists() and not self._current_model.endswith(".en"):
             model_file = models_dir / f"ggml-{self._current_model}.en.bin"
         if not model_file.exists():
-            print(f"[STT] Model file not found: {model_file}")
-            print(f"[STT] Download with: pywhispercpp-download {self._current_model}")
+            log.error("Model file not found: %s", model_file)
+            log.info("Download with: pywhispercpp-download %s", self._current_model)
             return False
 
         try:
@@ -46,13 +49,13 @@ class PyWhisperCppBackend(STTBackend):
                 redirect_whispercpp_logs_to=redirect_logs,
             )
             self.ready = True
-            print(f"[STT] pywhispercpp ready - model: {self._current_model}")
+            log.info("pywhispercpp ready - model: %s", self._current_model)
             return True
         except ImportError as e:
-            print(f"[STT] pywhispercpp not installed: {e}")
+            log.warning("pywhispercpp not installed: %s", e)
             return False
         except Exception as e:
-            print(f"[STT] pywhispercpp init failed: {e}")
+            log.warning("pywhispercpp init failed: %s", e)
             import traceback
             traceback.print_exc()
             return False
@@ -88,7 +91,7 @@ class PyWhisperCppBackend(STTBackend):
             segments = self._model.transcribe(audio_data, **transcribe_kwargs)
             return " ".join(seg.text for seg in segments).strip()
         except Exception as e:
-            print(f"[STT] Transcription failed: {e}")
+            log.warning("Transcription failed: %s", e)
             return ""
 
     def is_ready(self) -> bool:

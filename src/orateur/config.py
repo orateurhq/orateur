@@ -2,10 +2,13 @@
 
 import copy
 import json
+import logging
 from pathlib import Path
 from typing import Any, Dict
 
-from .paths import CONFIG_DIR, CONFIG_FILE, MCP_SERVERS_FILE
+from .paths import CONFIG_DIR, CONFIG_FILE
+
+log = logging.getLogger(__name__)
 
 
 class ConfigManager:
@@ -39,16 +42,15 @@ class ConfigManager:
             "llm_system_prompt": "You are a helpful assistant. Respond concisely.",
             "llm_base_url": "http://localhost:11434",
             "llm_mcp_transport": "stdio",
-            "llm_mcp_command": None,
             "llm_mcp_url": None,
             "llm_mcp_tool": "llm_generate",
+            "mcpServers": {},
             "paste_mode": "ctrl_shift",
             "paste_keycode": 47,
         }
 
         self.config_dir = CONFIG_DIR
         self.config_file = CONFIG_FILE
-        self.mcp_servers_file = MCP_SERVERS_FILE
         self.config = copy.deepcopy(self.default_config)
         self._ensure_config_dir()
         self._load_config()
@@ -58,7 +60,7 @@ class ConfigManager:
         try:
             self.config_dir.mkdir(parents=True, exist_ok=True)
         except Exception as e:
-            print(f"Warning: Could not create config directory: {e}")
+            log.warning("Could not create config directory: %s", e)
 
     def _load_config(self) -> None:
         """Load configuration from file."""
@@ -69,7 +71,7 @@ class ConfigManager:
                 loaded.pop("$schema", None)
                 self.config.update(loaded)
         except Exception as e:
-            print(f"Warning: Could not load config: {e}")
+            log.warning("Could not load config: %s", e)
 
     def save_config(self) -> bool:
         """Save current configuration to file."""
@@ -78,7 +80,7 @@ class ConfigManager:
                 json.dump(self.config, f, indent=2)
             return True
         except Exception as e:
-            print(f"Error: Could not save config: {e}")
+            log.error("Could not save config: %s", e)
             return False
 
     def get_setting(self, key: str, default: Any = None) -> Any:

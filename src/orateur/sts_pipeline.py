@@ -1,8 +1,11 @@
 """Speech-to-Speech pipeline: STT -> LLM -> TTS."""
 
+import logging
 from typing import Optional
 
 from .stt import get_stt_backend
+
+log = logging.getLogger(__name__)
 from .tts import get_tts_backend
 from .llm import get_llm_backend
 
@@ -36,24 +39,24 @@ def run_sts(
         llm = get_llm_backend(llm_name, config)
 
     if not stt or not stt.is_ready():
-        print("[STS] STT not ready")
+        log.error("STT not ready")
         return False
     if not tts or not tts.is_ready():
-        print("[STS] TTS not ready")
+        log.error("TTS not ready")
         return False
     if not llm or not llm.is_ready():
-        print("[STS] LLM not ready")
+        log.error("LLM not ready")
         return False
 
     text = stt.transcribe(audio_data, sample_rate, language_override)
     if not text or not text.strip():
-        print("[STS] No transcription")
+        log.error("No transcription")
         return False
 
     system_prompt = config.get_setting("llm_system_prompt", "You are a helpful assistant. Respond concisely.")
     response = llm.generate(text, system_prompt=system_prompt)
     if not response or not response.strip():
-        print("[STS] No LLM response")
+        log.error("No LLM response")
         return False
 
     return tts.synthesize_and_play(response)

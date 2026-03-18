@@ -1,9 +1,12 @@
 """Text injection via clipboard + ydotool paste."""
 
+import logging
 import shutil
 import subprocess
 import time
 from typing import Optional
+
+log = logging.getLogger(__name__)
 
 
 class TextInjector:
@@ -28,7 +31,7 @@ class TextInjector:
                     if shutil.which("xclip"):
                         subprocess.run(["xclip", "-selection", "clipboard"], input=text.encode("utf-8"), check=True)
                     else:
-                        print("[PASTE] No clipboard tool (wl-copy/xclip/pyperclip)")
+                        log.warning("No clipboard tool (wl-copy/xclip/pyperclip)")
                         return False
             time.sleep(0.12)
             if self.ydotool_available:
@@ -43,5 +46,5 @@ class TextInjector:
                     subprocess.run(["ydotool", "key", "29:1", kp, kr, "29:0"], capture_output=True, timeout=5)
             return True
         except Exception as e:
-            print(f"[PASTE] Failed: {e}")
+            log.warning("Failed: %s", e)
             return False

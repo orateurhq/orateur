@@ -1,11 +1,14 @@
 """Global keyboard shortcuts via evdev."""
 
+import logging
 import select
 import threading
 import time
 from typing import Callable, Optional
 
 import evdev
+
+log = logging.getLogger(__name__)
 from evdev import InputDevice, categorize, ecodes
 
 KEY_ALIASES = {
@@ -95,7 +98,7 @@ class ShortcutManager:
                     pass
             return len(self.devices) > 0
         except Exception as e:
-            print(f"[SHORTCUT] Discover error: {e}")
+            log.error("Discover error: %s", e)
             return False
 
     def _event_loop(self) -> None:
@@ -133,7 +136,7 @@ class ShortcutManager:
                                                 try:
                                                     threading.Thread(target=cb, daemon=True).start()
                                                 except Exception as e:
-                                                    print(f"[SHORTCUT] {name}: {e}")
+                                                    log.warning("%s: %s", name, e)
                         elif kev.keystate == 0:
                             self.pressed_keys.discard(event.code)
                             for name in self.shortcuts:
@@ -144,7 +147,7 @@ class ShortcutManager:
 
     def start(self) -> bool:
         if not self._discover():
-            print("[SHORTCUT] No keyboard devices found")
+            log.error("No keyboard devices found")
             return False
         self.stop_event.clear()
         self.thread = threading.Thread(target=self._event_loop, daemon=True)

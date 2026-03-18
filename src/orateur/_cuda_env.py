@@ -9,6 +9,7 @@ pywhispercpp wheel's bundled CUDA libs. For CUDA 13+ / Blackwell GPUs,
 use: orateur setup --build-from-source (editable install).
 """
 
+import logging
 import os
 import re
 import shutil
@@ -106,8 +107,7 @@ def _preload_cuda_libs(paths: list[str]) -> None:
                     except OSError:
                         continue
     if preloaded:
-        import sys
-        print(f"[CUDA] Preloaded: {', '.join(preloaded)}", file=sys.stderr, flush=True)
+        logging.getLogger("orateur._cuda_env").info("Preloaded: %s", ", ".join(preloaded))
 
 
 def _setup() -> None:
