@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# orateur launcher
+# orateur launcher — requires Python 3.10+
 # Uses fixed venv (~/.local/share/orateur/venv) for GPU-accelerated pywhispercpp.
 # In development (project has .venv), uses project venv. Sets LD_LIBRARY_PATH for CUDA/ROCm.
 
@@ -53,6 +53,17 @@ if [[ -z "$PYTHON_CMD" || ! -x "$PYTHON_CMD" ]]; then
     echo "Error: No Python found. Run 'orateur setup' first, or ensure system Python is installed." >&2
     exit 1
 fi
+
+require_python_310() {
+    local py="$1"
+    if ! "$py" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null; then
+        local ver
+        ver="$("$py" -c 'import sys; print(".".join(map(str, sys.version_info[:2])))' 2>/dev/null || echo "?")"
+        echo "Error: Orateur requires Python 3.10 or newer (found Python ${ver})." >&2
+        exit 1
+    fi
+}
+require_python_310 "$PYTHON_CMD"
 
 # Help handling
 for arg in "$@"; do

@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any
 
@@ -79,7 +80,17 @@ async def mcp_connections(config: Any):
                 if not cmd:
                     continue
                 args = args if isinstance(args, list) else [str(a) for a in args]
-                params = StdioServerParameters(command=str(cmd), args=args)
+                env_cfg = cfg.get("env")
+                if isinstance(env_cfg, dict) and env_cfg:
+                    merged_env = {
+                        **os.environ,
+                        **{str(k): str(v) for k, v in env_cfg.items()},
+                    }
+                    params = StdioServerParameters(
+                        command=str(cmd), args=args, env=merged_env
+                    )
+                else:
+                    params = StdioServerParameters(command=str(cmd), args=args)
                 try:
                     read, write = await stack.enter_async_context(stdio_client(params))
                     session = ClientSession(read, write)

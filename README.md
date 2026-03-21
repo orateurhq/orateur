@@ -2,6 +2,8 @@
 
 Minimal python local speech-to-text, text-to-speech and speech-to-speech assistant.
 
+**Requirements:** Python **3.10 or newer**. The `orateur` launcher checks this and exits with an error if the interpreter is too old.
+
 ## Features
 
 - **STT**: Whisper (pywhispercpp) for transcription
@@ -13,6 +15,8 @@ Minimal python local speech-to-text, text-to-speech and speech-to-speech assista
 - **Quickshell**: Panel widget with recording/TTS preview, waveform, and duration estimate
 
 ## Installation
+
+Use a system Python that satisfies **3.10+** (the venv created by `orateur setup` uses that interpreter).
 
 ### From package manager (no uv required)
 
