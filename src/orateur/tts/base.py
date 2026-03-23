@@ -83,3 +83,7 @@ class TTSBackend(ABC):
     def get_available_voices(self) -> list[str]:
         """Return list of available voice names."""
         return []
+
+    def stop_playback(self) -> None:
+        """Stop in-flight playback if supported. Override in backends that play audio."""
+        pass

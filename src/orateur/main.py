@@ -6,6 +6,7 @@ import logging
 import os
 import signal
 import sys
+import threading
 import time
 
 from .audio_capture import AudioCapture
@@ -67,6 +68,8 @@ def run(config: ConfigManager | None = None) -> None:
     injector = TextInjector(config)
 
     recording_for = [None]  # "stt" | "stt_secondary" | "sts" | None
+    tts_active = [False]
+    tts_lock = threading.Lock()
 
     def m(event: str, **payload) -> None:
         ui_mirror.send(config, event, **payload)
@@ -156,9 +159,17 @@ def run(config: ConfigManager | None = None) -> None:
                 m("error", message="Failed to start recording")
 
     def on_tts():
-        text = _get_text_from_selection(config)
-        if not text or not tts or not tts.is_ready():
+        if not tts or not tts.is_ready():
             return
+        with tts_lock:
+            if tts_active[0]:
+                tts.stop_playback()
+                return
+            text = _get_text_from_selection(config)
+            if not text:
+                return
+            tts_active[0] = True
+
         duration_sec = tts.estimate_duration(text)
         m("tts_estimate", duration_sec=duration_sec)
         m("tts_playing")
@@ -166,11 +177,16 @@ def run(config: ConfigManager | None = None) -> None:
         def on_lvl(level: float) -> None:
             m("tts_level", level=level)
 
+        ok = False
         try:
-            ok = tts.synthesize_and_play(text, level_callback=on_lvl)
-        except TypeError:
-            ok = tts.synthesize_and_play(text)
-        m("tts_done", success=bool(ok))
+            try:
+                ok = tts.synthesize_and_play(text, level_callback=on_lvl)
+            except TypeError:
+                ok = tts.synthesize_and_play(text)
+        finally:
+            with tts_lock:
+                tts_active[0] = False
+            m("tts_done", success=bool(ok))
 
     shortcuts = ShortcutManager(config)
     shortcuts.register("primary", config.get_setting("primary_shortcut"), on_primary)

@@ -2,6 +2,7 @@
 
 import logging
 import subprocess
+import threading
 import time
 from pathlib import Path
 from typing import Callable, Optional
@@ -28,6 +29,9 @@ class PocketTTSBackend(TTSBackend):
         self.ready = False
         self.voice = config.get_setting("tts_voice", "alba")
         self.volume = max(0.1, min(1.0, float(config.get_setting("tts_volume", 1.0))))
+        self._playback_lock = threading.Lock()
+        self._playback_proc: Optional[subprocess.Popen] = None
+        self._stop_event = threading.Event()
 
     def initialize(self, config) -> bool:
         self.config = config
@@ -51,6 +55,16 @@ class PocketTTSBackend(TTSBackend):
         if voice not in self._voice_state_cache:
             self._voice_state_cache[voice] = self._model.get_state_for_audio_prompt(voice)
         return self._voice_state_cache[voice]
+
+    def stop_playback(self) -> None:
+        self._stop_event.set()
+        with self._playback_lock:
+            proc = self._playback_proc
+        if proc is not None:
+            try:
+                proc.terminate()
+            except Exception:
+                pass
 
     def _get_streaming_player_cmd(self, volume: float) -> Optional[list]:
         vol = max(0.1, min(1.0, float(volume)))
@@ -105,10 +119,12 @@ class PocketTTSBackend(TTSBackend):
         vol = max(0.1, min(1.0, float(vol)))
         if not self.ready or not self._model:
             return False
+        self._stop_event.clear()
         cmd = self._get_streaming_player_cmd(vol)
         if not cmd:
             wav = self.synthesize(text, voice)
-            return wav and self._play_file(wav, vol)
+            return bool(wav and self._play_file(wav, vol))
+        proc: Optional[subprocess.Popen] = None
         try:
             voice_state = self._get_voice_state(voice)
             proc = subprocess.Popen(
@@ -117,48 +133,99 @@ class PocketTTSBackend(TTSBackend):
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            for chunk in self._model.generate_audio_stream(voice_state, text):
-                arr = chunk
-                if hasattr(chunk, "numpy"):
-                    arr = chunk.cpu().numpy() if hasattr(chunk, "cpu") else chunk.numpy()
-                arr = np.asarray(arr)
-                if arr.dtype.kind == "f":
-                    arr = (np.clip(arr, -1.0, 1.0) * 32767).astype(np.int16)
-                if level_callback is not None and len(arr) > 0:
-                    # Convert int16 back to float for RMS: arr/32768
-                    float_arr = arr.astype(np.float32) / 32768.0
-                    rms = float(np.sqrt(np.mean(float_arr ** 2)))
+            with self._playback_lock:
+                self._playback_proc = proc
+            interrupted = False
+            try:
+                for chunk in self._model.generate_audio_stream(voice_state, text):
+                    if self._stop_event.is_set():
+                        interrupted = True
+                        break
+                    arr = chunk
+                    if hasattr(chunk, "numpy"):
+                        arr = chunk.cpu().numpy() if hasattr(chunk, "cpu") else chunk.numpy()
+                    arr = np.asarray(arr)
+                    if arr.dtype.kind == "f":
+                        arr = (np.clip(arr, -1.0, 1.0) * 32767).astype(np.int16)
+                    if level_callback is not None and len(arr) > 0:
+                        float_arr = arr.astype(np.float32) / 32768.0
+                        rms = float(np.sqrt(np.mean(float_arr ** 2)))
+                        try:
+                            level_callback(rms)
+                        except Exception as e:
+                            log.debug("level_callback error: %s", e)
                     try:
-                        level_callback(rms)
-                    except Exception as e:
-                        log.debug("level_callback error: %s", e)
-                proc.stdin.write(arr.tobytes())
-                proc.stdin.flush()
-            proc.stdin.close()
-            proc.wait()
-            time.sleep(0.5)
-            return proc.returncode == 0
+                        proc.stdin.write(arr.tobytes())
+                        proc.stdin.flush()
+                    except BrokenPipeError:
+                        interrupted = True
+                        break
+                try:
+                    proc.stdin.close()
+                except Exception:
+                    pass
+                if interrupted or self._stop_event.is_set():
+                    try:
+                        proc.terminate()
+                        proc.wait(timeout=2.0)
+                    except Exception:
+                        pass
+                    return False
+                proc.wait()
+                time.sleep(0.5)
+                return proc.returncode == 0
+            finally:
+                with self._playback_lock:
+                    if self._playback_proc is proc:
+                        self._playback_proc = None
         except Exception as e:
             log.warning("Streaming failed: %s", e)
+            with self._playback_lock:
+                if proc is not None and self._playback_proc is proc:
+                    self._playback_proc = None
             wav = self.synthesize(text, voice)
-            return wav and self._play_file(wav, vol)
+            return bool(wav and self._play_file(wav, vol))
 
     def _play_file(self, wav_path: Path, volume: Optional[float] = None) -> bool:
         vol = 1.0 if volume is None else max(0.1, min(1.0, float(volume)))
         for player in ["pw-play", "paplay", "aplay", "ffplay"]:
             try:
                 r = subprocess.run(["which", player], capture_output=True, timeout=2)
-                if r.returncode == 0:
-                    if player == "pw-play":
-                        subprocess.run(["pw-play", "--volume", str(int(vol * 100)), str(wav_path)], check=True, timeout=60)
-                    elif player == "paplay":
-                        subprocess.run(["paplay", str(wav_path)], check=True, timeout=60)
-                    elif player == "aplay":
-                        subprocess.run(["aplay", "-q", str(wav_path)], check=True, timeout=60)
-                    else:
-                        subprocess.run(["ffplay", "-nodisp", "-autoexit", "-loglevel", "error", str(wav_path)], check=True, timeout=60)
-                    return True
-            except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
+                if r.returncode != 0:
+                    continue
+                if player == "pw-play":
+                    cmd = ["pw-play", "--volume", str(int(vol * 100)), str(wav_path)]
+                elif player == "paplay":
+                    cmd = ["paplay", str(wav_path)]
+                elif player == "aplay":
+                    cmd = ["aplay", "-q", str(wav_path)]
+                else:
+                    cmd = ["ffplay", "-nodisp", "-autoexit", "-loglevel", "error", str(wav_path)]
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                with self._playback_lock:
+                    self._playback_proc = proc
+                try:
+                    while True:
+                        if self._stop_event.is_set():
+                            proc.terminate()
+                            try:
+                                proc.wait(timeout=2.0)
+                            except subprocess.TimeoutExpired:
+                                proc.kill()
+                            return False
+                        ret = proc.poll()
+                        if ret is not None:
+                            return ret == 0
+                        time.sleep(0.05)
+                finally:
+                    with self._playback_lock:
+                        if self._playback_proc is proc:
+                            self._playback_proc = None
+            except (FileNotFoundError, OSError):
                 continue
         return False
 
