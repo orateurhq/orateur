@@ -4,6 +4,8 @@ Minimal python local speech-to-text, text-to-speech and speech-to-speech assista
 
 **Requirements:** Python **3.10 or newer**. The `orateur` launcher checks this and exits with an error if the interpreter is too old.
 
+![features of orateur](diagram.png)
+
 ## Features
 
 - **STT**: Whisper (pywhispercpp) for transcription
