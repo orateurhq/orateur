@@ -1,0 +1,13 @@
+.waveform {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  height: calc(var(--max-bar-height, 20px) + 4px);
+}
+
+.waveform__bar {
+  flex: 0 0 auto;
+  align-self: center;
+  border-radius: 1px;
+  background: #9ca3af;
+}

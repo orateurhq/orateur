@@ -108,11 +108,13 @@ Restart **`orateur`** after upgrading so the JSONL file is recreated; restart **
 
 The panel shows recording/TTS preview with waveform and duration estimate.
 
+**Tauri overlay (experimental):** a cross-platform window that reads the same JSONL file is in **`desktop/`**. See **`desktop/README.md`**.
+
 **Multiple monitors (Hyprland):** The bar uses a single layer surface on the **focused** Hyprland output (`import Quickshell.Hyprland`). When focus moves to another monitor, the panel follows. Your Quickshell package must include Hyprland integration (typical on Arch/AUR). On a single screen, or if Hyprland cannot match outputs, the first Quickshell screen is used.
 
 **FIFO / `orateur ui` (optional):** To drive recording from **`orateur ui-send`** instead of shortcuts, run **`orateur ui`** or **`orateur ui --events-only`** in a terminal; it uses **`~/.cache/orateur/cmd.fifo`**. That path is separate from **`ui_events.jsonl`**.
 
-**With `orateur run` (e.g. systemd):** **`quickshell_ui_mirror`** (default **`true`**) controls writing **`ui_events.jsonl`**. Set it to **`false`** to disable the bar updates.
+**With `orateur run` (e.g. systemd):** **`ui_events_mirror`** (default **`true`**) controls writing **`ui_events.jsonl`**. Set it to **`false`** to disable external UI updates (Quickshell panel, Tauri overlay, etc.).
 
 **Auto-start the panel:** set **`quickshell_autostart`** to **`true`** in **`config.json`**. Then **`orateur run`** spawns **`quickshell -c orateur`** after shortcuts are ready and stops it on exit. Leave **`false`** (default) if you launch Quickshell yourself or use another shell integration, to avoid two instances.
 
@@ -158,7 +160,7 @@ orateur systemd restart
 
 The unit is ordered after **PipeWire** and **graphical-session** so audio and your GUI session are up. Run **`orateur setup`** (or equivalent) so STT/TTS are ready, and keep **`~/.config/orateur/config.json`** in order.
 
-**Quickshell:** run **`quickshell -c orateur`** yourself, or set **`quickshell_autostart`** so **`orateur run`** starts it (see above). With **`quickshell_ui_mirror`** enabled (default), the service and the panel stay in sync when both run.
+**Quickshell:** run **`quickshell -c orateur`** yourself, or set **`quickshell_autostart`** so **`orateur run`** starts it (see above). With **`ui_events_mirror`** enabled (default), the service and any UI that tails **`ui_events.jsonl`** stay in sync when both run.
 
 **Development** (`uv`):
 
@@ -177,12 +179,14 @@ orateur config init
 orateur config show
 ```
 
-### Quickshell UI mirroring
+### UI events mirroring
 
 | Key | Default | Meaning |
 |-----|---------|---------|
-| `quickshell_ui_mirror` | `true` | `orateur run` appends UI events to **`~/.cache/orateur/ui_events.jsonl`** for the Quickshell panel (`tail -F`). |
+| `ui_events_mirror` | `true` | `orateur run` appends UI events to **`~/.cache/orateur/ui_events.jsonl`** for any client (Quickshell `tail -F`, Tauri **`desktop/`**, scripts). |
 | `quickshell_autostart` | `false` | If **`true`**, `orateur run` runs **`quickshell -c orateur`** as a child process and stops it on shutdown. |
+
+The deprecated key **`quickshell_ui_mirror`** is still read once on load and migrated to **`ui_events_mirror`**, then removed from the in-memory config.
 
 ### MCP tools (Ollama)
 

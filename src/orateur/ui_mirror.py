@@ -1,7 +1,7 @@
 """
-Mirror UI events to ~/.cache/orateur/ui_events.jsonl for Quickshell.
+Mirror UI events to ~/.cache/orateur/ui_events.jsonl when ``ui_events_mirror`` is enabled.
 
-Quickshell follows this file with ``tail -F`` (no second Orateur process). Lines are
+Any client can follow this file (e.g. Quickshell ``tail -F``, the Tauri desktop app). Lines are
 NDJSON with the same shape as ``orateur ui`` stdout: ``{"event": "...", ...}``.
 """
 
@@ -21,7 +21,7 @@ _lock = threading.Lock()
 
 
 def _mirror_enabled(config: ConfigManager) -> bool:
-    return bool(config.get_setting("quickshell_ui_mirror", False))
+    return bool(config.get_setting("ui_events_mirror", True))
 
 
 def _json_default(obj: Any) -> Any:

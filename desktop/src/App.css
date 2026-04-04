@@ -1,0 +1,253 @@
+:root {
+  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+  color: #e8e6ed;
+  background: #1c1b1f;
+}
+
+body {
+  margin: 0;
+}
+
+/* Borderless overlay window (see tauri.conf.json overlay) */
+html.app--overlay,
+body.app--overlay {
+  background: transparent !important;
+}
+
+#root {
+  min-height: 0;
+}
+
+body.app--overlay #root {
+  background: transparent;
+}
+
+/* Normal settings window */
+body.app--settings {
+  background: #1c1b1f;
+}
+
+/* Browser dev preview */
+.browserDev {
+  padding: 12px 16px;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.browserDev__note {
+  margin: 0 0 12px;
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+
+/* —— Floating overlay —— */
+.overlay {
+  padding: 6px 8px 4px;
+  box-sizing: border-box;
+}
+
+.overlay__bar {
+  background: rgba(43, 41, 48, 0.92);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 6px 10px 8px;
+  opacity: 0.78;
+  transition: opacity 0.2s;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+}
+
+.overlay__bar--active {
+  opacity: 0.98;
+}
+
+.overlay__chrome {
+  display: flex;
+  justify-content: flex-end;
+  margin: -2px -4px 4px 0;
+}
+
+.overlay__hide {
+  width: 22px;
+  height: 22px;
+  line-height: 20px;
+  padding: 0;
+  font-size: 16px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cac4d0;
+  cursor: pointer;
+}
+
+.overlay__hide:hover {
+  background: rgba(239, 68, 68, 0.35);
+  color: #fff;
+}
+
+.overlay__trayHint {
+  margin: 4px 0 0;
+  font-size: 10px;
+  color: rgba(156, 163, 175, 0.75);
+  text-align: center;
+}
+
+/* —— Settings window —— */
+.settings {
+  padding: 20px 22px 28px;
+  max-width: 560px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.settings__title {
+  margin: 0 0 14px;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.settings__hint {
+  margin: 0 0 12px;
+  font-size: 0.85rem;
+  color: #cac4d0;
+  line-height: 1.45;
+}
+
+.settings__hint--footer {
+  margin-top: 18px;
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.settings__label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: #cac4d0;
+}
+
+.settings__input {
+  background: #2b2930;
+  border: 1px solid #48464f;
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: #e8e6ed;
+  font-size: 0.85rem;
+  font-family: ui-monospace, monospace;
+}
+
+.settings__row {
+  margin-top: 14px;
+}
+
+.settings__btn {
+  background: #3f3d45;
+  color: #e8e6ed;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.settings__btn:hover {
+  background: #4a4752;
+}
+
+.settings__btn--primary {
+  background: #4f46e5;
+}
+
+.settings__btn--primary:hover {
+  background: #6366f1;
+}
+
+.settings__path {
+  margin: 12px 0 0;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  word-break: break-all;
+}
+
+/* —— Waveform row (shared) —— */
+.app__barInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 36px;
+}
+
+.app__waveWrap {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+
+.app__slot {
+  flex: 0 0 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app__slot--right {
+  justify-content: flex-end;
+}
+
+.app__pulse {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.app__ttsDot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.app__ttsDot--syn {
+  background: #f59e0b;
+}
+
+.app__ttsDot--play {
+  background: #22c55e;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.app__timer {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: #cac4d0;
+}
+
+.app__status {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.app__transcript {
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+  color: #d1d5db;
+  line-height: 1.35;
+  max-height: 100px;
+  overflow: auto;
+}
