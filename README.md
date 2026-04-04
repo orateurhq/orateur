@@ -60,15 +60,17 @@ uv sync
 
 ### Releasing (maintainers)
 
-1. Set **`version`** in **`pyproject.toml`** to the new release number.
-2. Commit and push, then tag and push the tag (the workflow runs on tag push):
+Use the **[Release](.github/workflows/release.yml)** workflow so the **semver**, **`pyproject.toml`**, **`uv.lock`**, desktop pins, **`Cargo.toml` / `Cargo.lock`**, and docs stay aligned with the wheel and **`install.sh`** (avoids 404s from a tag/wheel version mismatch).
+
+1. **Actions → Release → Run workflow** and enter the new version (e.g. **`0.1.3`**). The job runs [`scripts/sync_version_for_release.py`](scripts/sync_version_for_release.py), builds and checks the wheel, commits to the default branch if needed, creates **`v0.1.3`**, and uploads assets to that GitHub Release.
+
+2. From the CLI (with the GitHub CLI):
 
    ```bash
-   git tag v0.1.1   # must match pyproject version
-   git push origin v0.1.1
+   gh workflow run Release -f version=0.1.3
    ```
 
-3. The [Release workflow](.github/workflows/release.yml) builds the wheel and sdist, packages **`quickshell/`** into **`quickshell-orateur.tar.gz`**, embeds the version into **`install.sh`**, and uploads the wheel, sdist, **`install.sh`**, **`quickshell-orateur.tar.gz`**, and **`bin/orateur`** to the GitHub Release for that tag.
+3. To bump locally without CI (e.g. testing): `python3 scripts/sync_version_for_release.py 0.1.3`, then `uv lock`, then commit.
 
 ## GPU acceleration (NVIDIA CUDA or Apple Metal)
 
