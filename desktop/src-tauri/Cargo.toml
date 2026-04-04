@@ -30,6 +30,8 @@ windows = { version = "0.44", features = ["Win32_Foundation"] }
 objc2-app-kit = { version = "0.3", features = ["NSWindow", "NSView", "objc2-quartz-core"] }
 objc2-core-foundation = "0.3"
 objc2-quartz-core = { version = "0.3", features = ["CALayer"] }
+# NSPanel subclass for overlay above full-screen apps (see tauri#11488).
+tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.1" }
 
 [target.'cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "netbsd", target_os = "openbsd"))'.dependencies]
 gtk = "0.18"

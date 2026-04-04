@@ -22,9 +22,7 @@ pub fn create(app: &tauri::AppHandle) -> tauri::Result<()> {
         .on_menu_event(move |app, event| match event.id.as_ref() {
             "show" => {
                 if let Some(w) = app.get_webview_window("overlay") {
-                    overlay_workspace::overlay_show_on_active_workspace(&w);
-                    let _ = w.show();
-                    let _ = w.set_focus();
+                    overlay_workspace::show_overlay_window(&w);
                 }
             }
             "settings" => {

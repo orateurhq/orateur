@@ -6,6 +6,9 @@ mod tray;
 
 mod overlay_workspace;
 
+#[cfg(target_os = "macos")]
+mod macos_overlay_panel;
+
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
@@ -202,9 +205,7 @@ fn maybe_show_overlay_for_activity(app: &AppHandle, v: &serde_json::Value) {
         let app = app.clone();
         move || {
             if let Some(w) = app.get_webview_window("overlay") {
-                overlay_workspace::overlay_show_on_active_workspace(&w);
-                let _ = w.show();
-                let _ = w.set_focus();
+                overlay_workspace::show_overlay_window(&w);
             }
         }
     });
@@ -216,6 +217,14 @@ fn hide_overlay(app: AppHandle) -> Result<(), String> {
     let _ = app.run_on_main_thread({
         let app = app.clone();
         move || {
+            #[cfg(target_os = "macos")]
+            {
+                use tauri_nspanel::ManagerExt;
+                if let Ok(panel) = app.get_webview_panel("overlay") {
+                    tauri_nspanel::Panel::hide(&*panel);
+                    return;
+                }
+            }
             if let Some(w) = app.get_webview_window("overlay") {
                 let _ = w.hide();
             }
@@ -330,7 +339,14 @@ fn tail_loop(paths_shared: Arc<Mutex<PathsState>>, app: AppHandle, stop: Arc<Ato
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let app = tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder.plugin(tauri_nspanel::init());
+    }
+
+    let app = builder
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 let label = window.label();
@@ -365,15 +381,18 @@ pub fn run() {
             #[cfg(desktop)]
             tray::create(app.handle())?;
 
+            #[cfg(target_os = "macos")]
+            {
+                macos_overlay_panel::init_overlay_panel(app.handle())?;
+            }
+
             #[cfg(all(desktop, debug_assertions))]
             {
                 let h = app.handle().clone();
                 let h2 = h.clone();
                 let _ = h.run_on_main_thread(move || {
                     if let Some(w) = h2.get_webview_window("overlay") {
-                        overlay_workspace::overlay_show_on_active_workspace(&w);
-                        let _ = w.show();
-                        let _ = w.set_focus();
+                        overlay_workspace::show_overlay_window(&w);
                     }
                 });
             }

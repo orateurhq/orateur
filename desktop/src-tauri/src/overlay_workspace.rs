@@ -1,12 +1,41 @@
 //! Place the overlay on the user's current Space / virtual desktop / workspace when shown.
 
-use tauri::{Runtime, WebviewWindow};
+use tauri::{Manager, Runtime, WebviewWindow};
+
+/// Align the overlay with the active desktop, then show it.
+///
+/// On **macOS**, after [`crate::macos_overlay_panel::init_overlay_panel`], the overlay is an
+/// **`NSPanel`**. Use [`tauri_nspanel::Panel::show`] (implemented as `orderFrontRegardless`), not
+/// `WebviewWindow::show` (`makeKeyAndOrderFront`), or you break **`NonactivatingPanel`** and
+/// full-screen behavior (see [tauri-macos-spotlight-example](https://github.com/ahkohd/tauri-macos-spotlight-example)).
+///
+/// `set_focus` still maps to `activateIgnoringOtherApps:` on macOS — we never call it for the overlay.
+pub(crate) fn show_overlay_window<R: Runtime>(w: &WebviewWindow<R>) {
+    overlay_show_on_active_workspace(w);
+    #[cfg(target_os = "macos")]
+    {
+        use tauri_nspanel::ManagerExt;
+        match w.app_handle().get_webview_panel(w.label()) {
+            Ok(panel) => {
+                tauri_nspanel::Panel::show(&*panel);
+            }
+            Err(_) => {
+                let _ = w.show();
+            }
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+}
 
 /// Before `show()` + `set_focus()`, align the window with the active desktop (Spaces / VD / WM).
 pub(crate) fn overlay_show_on_active_workspace<R: Runtime>(w: &WebviewWindow<R>) {
     #[cfg(target_os = "macos")]
     {
-        macos_move_to_active_space(w);
+        // Full-screen / Spaces behavior is configured once on `NSPanel` (`macos_overlay_panel`).
         macos_round_overlay_window(w);
     }
 
@@ -21,20 +50,6 @@ pub(crate) fn overlay_show_on_active_workspace<R: Runtime>(w: &WebviewWindow<R>)
         target_os = "openbsd"
     ))]
     linux_gtk_present(w);
-}
-
-#[cfg(target_os = "macos")]
-fn macos_move_to_active_space<R: Runtime>(w: &WebviewWindow<R>) {
-    let Ok(ptr) = w.ns_window() else {
-        return;
-    };
-    unsafe {
-        use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior};
-        let ns_window = &*ptr.cast::<NSWindow>();
-        let mut cb = ns_window.collectionBehavior();
-        cb |= NSWindowCollectionBehavior::MoveToActiveSpace;
-        ns_window.setCollectionBehavior(cb);
-    }
 }
 
 /// Match `border-radius` on `.overlay__bar` in `App.css` so the borderless window clips to the same
