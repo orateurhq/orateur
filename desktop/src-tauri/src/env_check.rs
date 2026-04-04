@@ -11,7 +11,7 @@ use tauri::{AppHandle, Manager};
 use wait_timeout::ChildExt;
 
 /// Default when `resources/orateur-pip-spec.txt` is missing (e.g. some dev runs).
-const DEFAULT_PIP_SPEC: &str = "orateur==0.1.1";
+const DEFAULT_PIP_SPEC: &str = "orateur==0.1.3";
 
 const CHECK_TIMEOUT: Duration = Duration::from_secs(25);
 const INSTALL_TIMEOUT: Duration = Duration::from_secs(600);
@@ -84,7 +84,7 @@ fn install_orateur_version(app: &AppHandle) -> String {
     if let Some(v) = orateur_version_from_pip_spec(&read_pip_spec(app)) {
         return v;
     }
-    orateur_version_from_pip_spec(DEFAULT_PIP_SPEC).unwrap_or_else(|| "0.1.1".to_string())
+    orateur_version_from_pip_spec(DEFAULT_PIP_SPEC).unwrap_or_else(|| "0.1.3".to_string())
 }
 
 /// Public: what the Install button will run.
