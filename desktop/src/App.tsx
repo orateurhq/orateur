@@ -263,55 +263,8 @@ function OverlayPanel() {
 
   const hideTimerRef = useRef<number | null>(null);
 
-  // #region agent log
-  useEffect(() => {
-    fetch("http://127.0.0.1:7320/ingest/a346a257-a263-4c19-ba30-f18a99f44a82", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "15b347" },
-      body: JSON.stringify({
-        sessionId: "15b347",
-        hypothesisId: "C",
-        location: "App.tsx:OverlayPanel:activeSnapshot",
-        message: "isActive inputs",
-        data: {
-          uiState: state.uiState,
-          showAfterDone: state.showAfterDone,
-          stateRecording: state.recording,
-          visualRecording: visualState.recording,
-          fakeRecording: debug.fakeRecording,
-          overlayNoAutoHide: debug.overlayNoAutoHide,
-          rawFake: import.meta.env.VITE_DEBUG_FAKE_RECORDING,
-          rawNoAutoHide: import.meta.env.VITE_DEBUG_OVERLAY_NO_AUTO_HIDE,
-          isActive,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-  }, [
-    state.uiState,
-    state.showAfterDone,
-    state.recording,
-    visualState.recording,
-    isActive,
-  ]);
-  // #endregion
-
   useEffect(() => {
     if (debug.overlayNoAutoHide) {
-      // #region agent log
-      fetch("http://127.0.0.1:7320/ingest/a346a257-a263-4c19-ba30-f18a99f44a82", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "15b347" },
-        body: JSON.stringify({
-          sessionId: "15b347",
-          hypothesisId: "B",
-          location: "App.tsx:OverlayPanel:hideEffect",
-          message: "branch overlayNoAutoHide skip",
-          data: { overlayNoAutoHide: true },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       return;
     }
     if (isActive) {
@@ -319,56 +272,11 @@ function OverlayPanel() {
         window.clearTimeout(hideTimerRef.current);
         hideTimerRef.current = null;
       }
-      // #region agent log
-      fetch("http://127.0.0.1:7320/ingest/a346a257-a263-4c19-ba30-f18a99f44a82", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "15b347" },
-        body: JSON.stringify({
-          sessionId: "15b347",
-          runId: "post-fix",
-          hypothesisId: "A",
-          location: "App.tsx:OverlayPanel:hideEffect",
-          message: "branch isActive — cancel hide timer",
-          data: { isActive: true },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       return;
     }
-    // #region agent log
-    fetch("http://127.0.0.1:7320/ingest/a346a257-a263-4c19-ba30-f18a99f44a82", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "15b347" },
-      body: JSON.stringify({
-        sessionId: "15b347",
-        runId: "post-fix",
-        hypothesisId: "A",
-        location: "App.tsx:OverlayPanel:hideEffect",
-        message: "schedule hide timer (idle)",
-        data: { isActive: false },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     hideTimerRef.current = window.setTimeout(() => {
       hideTimerRef.current = null;
       void (async () => {
-        // #region agent log
-        fetch("http://127.0.0.1:7320/ingest/a346a257-a263-4c19-ba30-f18a99f44a82", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "15b347" },
-          body: JSON.stringify({
-            sessionId: "15b347",
-            runId: "post-fix",
-            hypothesisId: "D",
-            location: "App.tsx:OverlayPanel:hideTimer",
-            message: "invoke hide_overlay",
-            data: { isTauri: await isTauri() },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
         if (await isTauri()) {
           await invoke("hide_overlay").catch(() => {});
         }

@@ -279,9 +279,15 @@ elif sys.platform in ("darwin", "win32"):
 
         def register(self, name: str, shortcut: Optional[str], callback: Callable[[], None]) -> None:
             if not shortcut:
+                log.warning("Shortcut %r is empty in config — not registered", name)
                 return
             combo = _shortcut_to_pynput(shortcut)
             if not combo:
+                log.error(
+                    "Shortcut %r could not be parsed (check spelling): %r — not registered",
+                    name,
+                    shortcut,
+                )
                 return
 
             def make_handler(cb: Callable[[], None], nm: str) -> Callable[[], None]:
@@ -313,6 +319,11 @@ elif sys.platform in ("darwin", "win32"):
             try:
                 self._listener = keyboard.GlobalHotKeys(self._hotkey_map)
                 self._listener.start()
+                log.info(
+                    "pynput global hotkeys started (%d): %s",
+                    len(self._hotkey_map),
+                    ", ".join(sorted(self._hotkey_map.keys())),
+                )
             except Exception as e:
                 log.error("Could not start global hotkeys: %s", e)
                 log.error(

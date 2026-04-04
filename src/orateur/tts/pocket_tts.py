@@ -1,7 +1,9 @@
 """Pocket TTS backend."""
 
 import logging
+import shutil
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -67,6 +69,10 @@ class PocketTTSBackend(TTSBackend):
                 pass
 
     def _get_streaming_player_cmd(self, volume: float) -> Optional[list]:
+        # ffplay (and similar) raw-PCM-over-stdin streaming often exits non-zero or breaks the
+        # pipe on macOS when Homebrew ffplay is on PATH. WAV + afplay is reliable instead.
+        if sys.platform == "darwin":
+            return None
         vol = max(0.1, min(1.0, float(volume)))
         sr = str(self._model.sample_rate)
         for check, cmd in [
@@ -75,12 +81,8 @@ class PocketTTSBackend(TTSBackend):
             ("aplay", ["aplay", "-q", "-t", "raw", "-f", "S16_LE", "-r", sr, "-c", "1", "-"]),
             ("ffplay", ["ffplay", "-nodisp", "-autoexit", "-loglevel", "error", "-f", "s16le", "-ar", sr, "-ac", "1", "-volume", str(int(vol * 100)), "-i", "pipe:0"]),
         ]:
-            try:
-                r = subprocess.run(["which", check], capture_output=True, timeout=2)
-                if r.returncode == 0:
-                    return cmd
-            except Exception:
-                pass
+            if shutil.which(check):
+                return cmd
         return None
 
     def synthesize(
@@ -122,8 +124,17 @@ class PocketTTSBackend(TTSBackend):
         self._stop_event.clear()
         cmd = self._get_streaming_player_cmd(vol)
         if not cmd:
+            log.info(
+                "Pocket TTS: using WAV file + system player (macOS skips stdin streaming; "
+                "or no pw-play/paplay/aplay/ffplay for streaming)"
+            )
             wav = self.synthesize(text, voice)
-            return bool(wav and self._play_file(wav, vol))
+            if not wav:
+                log.warning("Pocket TTS: synthesis produced no WAV file")
+            ok = bool(wav and self._play_file(wav, vol))
+            log.info("Pocket TTS: WAV playback finished ok=%s", ok)
+            return ok
+        log.info("Pocket TTS: streaming playback via %s", cmd[0])
         proc: Optional[subprocess.Popen] = None
         try:
             voice_state = self._get_voice_state(voice)
@@ -173,7 +184,9 @@ class PocketTTSBackend(TTSBackend):
                     return False
                 proc.wait()
                 time.sleep(0.5)
-                return proc.returncode == 0
+                ok_stream = proc.returncode == 0
+                log.info("Pocket TTS: stream finished ok=%s (exit %s)", ok_stream, proc.returncode)
+                return ok_stream
             finally:
                 with self._playback_lock:
                     if self._playback_proc is proc:
@@ -188,17 +201,20 @@ class PocketTTSBackend(TTSBackend):
 
     def _play_file(self, wav_path: Path, volume: Optional[float] = None) -> bool:
         vol = 1.0 if volume is None else max(0.1, min(1.0, float(volume)))
-        for player in ["pw-play", "paplay", "aplay", "ffplay"]:
+        # macOS ships afplay; Linux/BSD typically use pipewire/pulse/alsa or ffplay.
+        for player in ["pw-play", "paplay", "aplay", "ffplay", "afplay"]:
+            if not shutil.which(player):
+                continue
+            log.info("Pocket TTS: playing WAV with %s", player)
             try:
-                r = subprocess.run(["which", player], capture_output=True, timeout=2)
-                if r.returncode != 0:
-                    continue
                 if player == "pw-play":
                     cmd = ["pw-play", "--volume", str(int(vol * 100)), str(wav_path)]
                 elif player == "paplay":
                     cmd = ["paplay", str(wav_path)]
                 elif player == "aplay":
                     cmd = ["aplay", "-q", str(wav_path)]
+                elif player == "afplay":
+                    cmd = ["afplay", "-v", str(vol), str(wav_path)]
                 else:
                     cmd = ["ffplay", "-nodisp", "-autoexit", "-loglevel", "error", str(wav_path)]
                 proc = subprocess.Popen(
@@ -227,6 +243,10 @@ class PocketTTSBackend(TTSBackend):
                             self._playback_proc = None
             except (FileNotFoundError, OSError):
                 continue
+        log.warning(
+            "No usable audio player found (tried pw-play, paplay, aplay, ffplay, afplay). "
+            "On macOS, afplay should exist in /usr/bin — check PATH."
+        )
         return False
 
     def is_ready(self) -> bool:

@@ -54,6 +54,7 @@ class TTSBackend(ABC):
             ("paplay", ["paplay", str(wav_path)]),
             ("aplay", ["aplay", "-q", str(wav_path)]),
             ("ffplay", ["ffplay", "-nodisp", "-autoexit", "-loglevel", "error", str(wav_path)]),
+            ("afplay", ["afplay", "-v", str(vol), str(wav_path)]),
         ]:
             try:
                 r = subprocess.run(["which", player], capture_output=True, timeout=2)

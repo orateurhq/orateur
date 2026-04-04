@@ -1,4 +1,8 @@
-"""Application-wide logging configuration."""
+"""Application-wide logging configuration.
+
+All ``orateur.*`` log records go to **stderr**. When you run ``orateur run`` in a terminal,
+you should see them in that terminal. Set ``ORATEUR_LOG_LEVEL=DEBUG`` for more detail.
+"""
 
 import logging
 import os
@@ -37,3 +41,14 @@ def get_logger(name: str) -> logging.Logger:
     if name.startswith("orateur"):
         return logging.getLogger(name)
     return logging.getLogger(f"orateur.{name}")
+
+
+def ensure_logging_configured() -> None:
+    """Ensure the ``orateur`` logger has a stderr handler.
+
+    ``orateur.cli`` calls ``setup_logging()`` first; this is a fallback when ``run()`` is
+    entered without the CLI (tests, embedding). Safe to call after ``setup_logging`` (no-op).
+    """
+    lg = logging.getLogger("orateur")
+    if not lg.handlers:
+        setup_logging()
