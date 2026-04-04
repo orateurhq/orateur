@@ -3,6 +3,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Waveform } from "./components/Waveform";
+import { debug } from "./debug";
 import {
   initialOrateurState,
   overlayVisualState,
@@ -186,40 +187,114 @@ function OverlayPanel() {
   const isActive =
     visualState.uiState !== "idle" || state.showAfterDone || visualState.recording;
 
-  const wasActiveRef = useRef(false);
   const hideTimerRef = useRef<number | null>(null);
 
+  // #region agent log
   useEffect(() => {
-    const onFocus = () => {
-      if (hideTimerRef.current !== null) {
-        window.clearTimeout(hideTimerRef.current);
-        hideTimerRef.current = null;
-      }
-    };
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, []);
+    fetch("http://127.0.0.1:7320/ingest/a346a257-a263-4c19-ba30-f18a99f44a82", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "15b347" },
+      body: JSON.stringify({
+        sessionId: "15b347",
+        hypothesisId: "C",
+        location: "App.tsx:OverlayPanel:activeSnapshot",
+        message: "isActive inputs",
+        data: {
+          uiState: state.uiState,
+          showAfterDone: state.showAfterDone,
+          stateRecording: state.recording,
+          visualRecording: visualState.recording,
+          fakeRecording: debug.fakeRecording,
+          overlayNoAutoHide: debug.overlayNoAutoHide,
+          rawFake: import.meta.env.VITE_DEBUG_FAKE_RECORDING,
+          rawNoAutoHide: import.meta.env.VITE_DEBUG_OVERLAY_NO_AUTO_HIDE,
+          isActive,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  }, [
+    state.uiState,
+    state.showAfterDone,
+    state.recording,
+    visualState.recording,
+    isActive,
+  ]);
+  // #endregion
 
   useEffect(() => {
-    // Dev: keep the borderless overlay window visible without recording/TTS events.
-    if (import.meta.env.DEV) {
+    if (debug.overlayNoAutoHide) {
+      // #region agent log
+      fetch("http://127.0.0.1:7320/ingest/a346a257-a263-4c19-ba30-f18a99f44a82", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "15b347" },
+        body: JSON.stringify({
+          sessionId: "15b347",
+          hypothesisId: "B",
+          location: "App.tsx:OverlayPanel:hideEffect",
+          message: "branch overlayNoAutoHide skip",
+          data: { overlayNoAutoHide: true },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       return;
     }
     if (isActive) {
-      wasActiveRef.current = true;
       if (hideTimerRef.current !== null) {
         window.clearTimeout(hideTimerRef.current);
         hideTimerRef.current = null;
       }
+      // #region agent log
+      fetch("http://127.0.0.1:7320/ingest/a346a257-a263-4c19-ba30-f18a99f44a82", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "15b347" },
+        body: JSON.stringify({
+          sessionId: "15b347",
+          runId: "post-fix",
+          hypothesisId: "A",
+          location: "App.tsx:OverlayPanel:hideEffect",
+          message: "branch isActive — cancel hide timer",
+          data: { isActive: true },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       return;
     }
-    if (!wasActiveRef.current) {
-      return;
-    }
-    wasActiveRef.current = false;
+    // #region agent log
+    fetch("http://127.0.0.1:7320/ingest/a346a257-a263-4c19-ba30-f18a99f44a82", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "15b347" },
+      body: JSON.stringify({
+        sessionId: "15b347",
+        runId: "post-fix",
+        hypothesisId: "A",
+        location: "App.tsx:OverlayPanel:hideEffect",
+        message: "schedule hide timer (idle)",
+        data: { isActive: false },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     hideTimerRef.current = window.setTimeout(() => {
       hideTimerRef.current = null;
       void (async () => {
+        // #region agent log
+        fetch("http://127.0.0.1:7320/ingest/a346a257-a263-4c19-ba30-f18a99f44a82", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "15b347" },
+          body: JSON.stringify({
+            sessionId: "15b347",
+            runId: "post-fix",
+            hypothesisId: "D",
+            location: "App.tsx:OverlayPanel:hideTimer",
+            message: "invoke hide_overlay",
+            data: { isTauri: await isTauri() },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
         if (await isTauri()) {
           await invoke("hide_overlay").catch(() => {});
         }
@@ -231,7 +306,7 @@ function OverlayPanel() {
         hideTimerRef.current = null;
       }
     };
-  }, [isActive]);
+  }, [isActive, debug.overlayNoAutoHide]);
 
   return (
     <div className="overlay">
