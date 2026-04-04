@@ -1,1 +1,1 @@
-orateur==0.1.0
+orateur==0.1.1

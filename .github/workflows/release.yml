@@ -28,6 +28,20 @@ jobs:
       - name: Build wheel and sdist
         run: python -m build
 
+      - name: Verify wheel contains Python package
+        run: |
+          python - <<'PY'
+          import zipfile
+          from pathlib import Path
+
+          whl = next(Path("dist").glob("*.whl"))
+          with zipfile.ZipFile(whl) as z:
+              names = z.namelist()
+          py_under_pkg = [n for n in names if n.startswith("orateur/") and n.endswith(".py")]
+          assert py_under_pkg, f"{whl} has no orateur/*.py (got {len(names)} entries): {names[:15]}"
+          print(f"OK: {whl.name} has {len(py_under_pkg)} orateur/*.py files")
+          PY
+
       - name: Package Quickshell assets
         run: tar -czf quickshell-orateur.tar.gz quickshell
 

@@ -27,7 +27,7 @@ Each [release](https://github.com/antoineFrau/orateur/releases) publishes **`ins
 **One command** (replace the tag with the release you want):
 
 ```bash
-curl -fsSL https://github.com/antoineFrau/orateur/releases/download/v0.1.0/install.sh | bash
+curl -fsSL https://github.com/antoineFrau/orateur/releases/download/v0.1.1/install.sh | bash
 ```
 
 The release’s **`install.sh`** embeds the version, so it needs no arguments. To run a copy of [`scripts/install.sh`](scripts/install.sh) from the repository instead, pass a version or set **`ORATEUR_VERSION`**:
@@ -35,8 +35,8 @@ The release’s **`install.sh`** embeds the version, so it needs no arguments. T
 ```bash
 curl -fsSL https://raw.githubusercontent.com/antoineFrau/orateur/main/scripts/install.sh -o install.sh
 chmod +x install.sh
-./install.sh 0.1.0
-# or: ORATEUR_VERSION=0.1.0 ./install.sh
+./install.sh 0.1.1
+# or: ORATEUR_VERSION=0.1.1 ./install.sh
 ```
 
 Ensure **`~/.local/bin`** is on your **`PATH`** (many distros add it by default). Then run **`orateur setup`** once (models, optional GPU STT, Quickshell panel, etc.), then commands such as **`orateur run`**.
@@ -64,8 +64,8 @@ uv sync
 2. Commit and push, then tag and push the tag (the workflow runs on tag push):
 
    ```bash
-   git tag v0.1.0   # must match pyproject version
-   git push origin v0.1.0
+   git tag v0.1.1   # must match pyproject version
+   git push origin v0.1.1
    ```
 
 3. The [Release workflow](.github/workflows/release.yml) builds the wheel and sdist, packages **`quickshell/`** into **`quickshell-orateur.tar.gz`**, embeds the version into **`install.sh`**, and uploads the wheel, sdist, **`install.sh`**, **`quickshell-orateur.tar.gz`**, and **`bin/orateur`** to the GitHub Release for that tag.
