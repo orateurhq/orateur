@@ -18,6 +18,8 @@ Minimal python local speech-to-text, text-to-speech and speech-to-speech assista
 - **Systemd**: Background service with pre-loaded models
 - **Quickshell**: Panel widget with recording/TTS preview, waveform, and duration estimate
 
+**Documentation:** [orateurhq.github.io/orateur](https://orateurhq.github.io/orateur/) (MkDocs; build locally with `uv run mkdocs serve` after `uv sync --dev`).
+
 ## Installation
 
 Use a system Python that satisfies **3.10+** (the venv used by `orateur setup` is created with that interpreter). You also need **`pip`** and a working **`venv`** (`python3 -m venv`). On Debian/Ubuntu, install **`python3-venv`** if `venv` is missing.
