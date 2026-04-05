@@ -1,0 +1,35 @@
+# Shared verify steps for CI and Semantic Release (push to main).
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: pre-commit (ruff + repo hooks)
+        run: uv run pre-commit run --all-files
+
+      - name: Type check (ty)
+        run: uv run ty check
+
+      - name: Build wheel
+        run: uv build --wheel
+
+      - name: Verify wheel contains Python package
+        run: uv run python scripts/verify_release_wheel.py

@@ -2,256 +2,184 @@
 
 ![Orateur logo](logo.png)
 
-Minimal python local speech-to-text, text-to-speech and speech-to-speech assistant.
+Local **speech-to-text** (Whisper), **text-to-speech** (Pocket TTS), and **speech-to-speech** (STT → Ollama → TTS), with optional **MCP tools**, **global shortcuts**, and a **status UI** (Quickshell panel or [Tauri desktop](desktop/) overlay).
 
-**Requirements:** Python **3.10 or newer**. The `orateur` launcher checks this and exits with an error if the interpreter is too old.
+**Python 3.10+** is required; the `orateur` launcher refuses older interpreters.
 
-![features of orateur](diagram.png)
+**Documentation:** [orateurhq.github.io/orateur](https://orateurhq.github.io/orateur/) (MkDocs — `uv sync --dev` then `uv run mkdocs serve`). High-level architecture: [`diagram.png`](diagram.png) in the repo root.
+
+---
+
+## Screenshots
+
+Settings from the **desktop app** (paths under `docs/screenshots/`). The same gallery appears on the [documentation site](https://orateurhq.github.io/orateur/).
+
+| General | Shortcuts |
+| :-----: | :-------: |
+| ![Settings — General](docs/screenshots/settings-general.png) | ![Settings — Shortcuts](docs/screenshots/settings-shortcuts.png) |
+
+| Speech-to-text | Text-to-speech |
+| :------------: | :------------: |
+| ![Settings — STT](docs/screenshots/settings-stt.png) | ![Settings — TTS](docs/screenshots/settings-tts.png) |
+
+| Speech-to-speech |
+| :--------------: |
+| ![Settings — STS](docs/screenshots/settings-sts.png) |
+
+---
 
 ## Features
 
-- **STT**: Whisper (pywhispercpp) for transcription
-- **TTS**: Pocket TTS for text-to-speech
-- **STS**: Speech-to-Speech (STT → Ollama/LLM → TTS)
-- **MCP**: Tool providers via Model Context Protocol (Ollama uses them as function tools)
-- **Shortcuts**: Global keyboard shortcuts (evdev)
-- **Systemd**: Background service with pre-loaded models
-- **Quickshell**: Panel widget with recording/TTS preview, waveform, and duration estimate
+- **STT** — Whisper via pywhispercpp
+- **TTS** — Pocket TTS
+- **STS** — Speech-to-speech through a local LLM (e.g. Ollama)
+- **MCP** — Tool servers exposed to the model (stdio + optional SSE)
+- **Shortcuts** — Global hotkeys (Linux: evdev; macOS/Windows: pynput)
+- **Systemd** — Optional user service with models loaded once
+- **UI** — Quickshell bar and/or Tauri overlay, driven by `~/.cache/orateur/ui_events.jsonl`
 
-**Documentation:** [orateurhq.github.io/orateur](https://orateurhq.github.io/orateur/) (MkDocs; build locally with `uv run mkdocs serve` after `uv sync --dev`).
+---
 
-## Installation
+## Install
 
-Use a system Python that satisfies **3.10+** (the venv used by `orateur setup` is created with that interpreter). You also need **`pip`** and a working **`venv`** (`python3 -m venv`). On Debian/Ubuntu, install **`python3-venv`** if `venv` is missing.
+You need **`pip`**, **`python3 -m venv`**, and a system Python **≥ 3.10**. On Debian/Ubuntu, install **`python3-venv`** if `venv` is missing.
 
-### From GitHub Releases (no PyPI)
+### Release installer (recommended)
 
-Each [release](https://github.com/orateurhq/orateur/releases) publishes **`install.sh`**, a **wheel**, an **sdist**, **`quickshell-orateur.tar.gz`** (panel assets), and the **`bin/orateur`** launcher. The installer creates **`~/.local/share/orateur/venv`**, installs Orateur with pip, unpacks Quickshell files under that data directory, and installs the launcher as **`~/.local/bin/orateur`** (override with **`ORATEUR_BIN_DIR`**).
+Each [GitHub release](https://github.com/orateurhq/orateur/releases) ships **`install.sh`**, a wheel, **`quickshell-orateur.tar.gz`**, and the **`bin/orateur`** launcher. The script installs into **`~/.local/share/orateur/venv`**, puts **`orateur`** in **`~/.local/bin`** (override with **`ORATEUR_BIN_DIR`**), and unpacks Quickshell assets.
 
-**One command** (replace the tag with the release you want):
+```bash
+curl -fsSL https://github.com/orateurhq/orateur/releases/latest/download/install.sh | bash
+```
+
+If **`latest` is unavailable**, use a concrete tag (see [releases](https://github.com/orateurhq/orateur/releases)):
 
 ```bash
 curl -fsSL https://github.com/orateurhq/orateur/releases/download/v0.1.3/install.sh | bash
 ```
 
-The release’s **`install.sh`** embeds the version, so it needs no arguments. To run a copy of [`scripts/install.sh`](scripts/install.sh) from the repository instead, pass a version or set **`ORATEUR_VERSION`**:
+From a repo checkout you can instead run [`scripts/install.sh`](scripts/install.sh) with a version or **`ORATEUR_VERSION`**.
+
+Ensure **`~/.local/bin`** is on **`PATH`**, then:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/orateurhq/orateur/main/scripts/install.sh -o install.sh
-chmod +x install.sh
-./install.sh 0.1.3
-# or: ORATEUR_VERSION=0.1.3 ./install.sh
+orateur setup    # models, optional GPU STT, Quickshell panel, …
+orateur run      # main loop (also what systemd uses)
 ```
 
-Ensure **`~/.local/bin`** is on your **`PATH`** (many distros add it by default). Then run **`orateur setup`** once (models, optional GPU STT, Quickshell panel, etc.), then commands such as **`orateur run`**.
+The [Tauri app](desktop/) uses the same install flow on macOS/Linux (bundled wheel optional). **Windows** currently uses **`pip install --user`** until a native installer exists.
 
-The desktop app (**`desktop/`**) uses the same script: on **macOS** and **Linux** it runs **`install.sh`** from the app bundle (with a bundled wheel when **`resources/orateur-bundle.whl`** is present). **Windows** still uses **`pip install --user`** until a native installer exists.
+### Distro packages
 
-### From package manager (no uv required)
+If your package manager installs `orateur`, run **`orateur setup`** once, then **`orateur run`**.
 
-When installed via your distro (e.g. AUR), run setup once to create the venv and install GPU support:
-
-```bash
-orateur setup
-```
-
-### Development (with uv)
+### Development ([uv](https://docs.astral.sh/uv/))
 
 ```bash
+git clone https://github.com/orateurhq/orateur.git
 cd orateur
 uv sync
-```
-
-### Releasing (maintainers)
-
-Use the **[Release](.github/workflows/release.yml)** workflow so the **semver**, **`pyproject.toml`**, **`uv.lock`**, desktop pins, **`Cargo.toml` / `Cargo.lock`**, and docs stay aligned with the wheel and **`install.sh`** (avoids 404s from a tag/wheel version mismatch).
-
-1. **Actions → Release → Run workflow** and enter the new version (e.g. **`0.1.3`**). The job runs [`scripts/sync_version_for_release.py`](scripts/sync_version_for_release.py), builds and checks the wheel, commits to the default branch if needed, creates **`v0.1.3`**, and uploads assets to that GitHub Release.
-
-2. From the CLI (with the GitHub CLI):
-
-   ```bash
-   gh workflow run Release -f version=0.1.3
-   ```
-
-3. To bump locally without CI (e.g. testing): `python3 scripts/sync_version_for_release.py 0.1.3`, then `uv lock`, then commit.
-
-## GPU acceleration (NVIDIA CUDA or Apple Metal)
-
-The default `pywhispercpp` wheel from PyPI is CPU-only. Run setup to build from source with a GPU backend where supported:
-
-```bash
-# Installed users
-orateur setup
-
-# Development
 uv run orateur setup
+uv run orateur run
 ```
 
-- **Linux x86_64 + CUDA** (detected via `nvcc` or `nvidia-smi`): builds with CUDA.
-- **macOS Apple Silicon (arm64)**: builds with Metal (Apple GPU).
-- **Otherwise**: installs the CPU wheel from PyPI.
-
-CUDA is not available on macOS; Metal is not used on Linux. Options:
-
-```bash
-orateur setup --backend auto   # default: CUDA on Linux+GPU, Metal on Apple Silicon, else CPU wheel
-orateur setup --backend nvidia # force CUDA build (Linux only; fails if no CUDA)
-orateur setup --backend metal  # force Metal build (Apple Silicon only)
-orateur setup --backend cpu    # PyPI CPU only
-orateur setup --build-from-source  # force editable build: CUDA (Linux) or Metal (Apple Silicon)
-orateur setup --force          # reinstall even if already installed
-```
-
-Setup skips installation when pywhispercpp is already installed with the correct backend. Use `--force` to reinstall.
-
-GPU builds can take several minutes (Xcode Command Line Tools are required on macOS).
-
-`setup` passes `pip install --break-system-packages` only when installing into the active venv (needed for **uv**-managed Python environments that enforce PEP 668).
-
-The **`bin/orateur`** launcher uses the **project `.venv`** when it exists (same as `uv run`), otherwise `~/.local/share/orateur/venv`. Run **setup** and **run** with the same venv (or reinstall after changing workflows).
+---
 
 ## Usage
 
+| Command | Role |
+|--------|------|
+| `orateur run` | Main loop (shortcuts, STS, UI events); use with **systemd** for a headless session |
+| `orateur transcribe` | Transcribe from the mic |
+| `orateur sts` | Speech-to-speech |
+| `orateur speak` | TTS from the current selection |
+| `orateur config init` / `show` | Config under **`~/.config/orateur/config.json`** |
+
+Use **`uv run orateur …`** in a development tree.
+
+---
+
+## GPU acceleration (CUDA / Metal)
+
+Default pywhispercpp wheels are CPU-only. **`orateur setup`** can build from source when a GPU stack is present:
+
+- **Linux + NVIDIA** — CUDA if `nvcc` / `nvidia-smi` indicate a toolkit
+- **Apple Silicon** — Metal
+- **Otherwise** — CPU wheel from PyPI
+
 ```bash
-# Run main loop (used by systemd)
-orateur run
-
-# Transcribe
-orateur transcribe
-
-# Speech-to-Speech
-orateur sts
-
-# TTS from selection
-orateur speak
+orateur setup --backend auto    # default
+orateur setup --backend nvidia  # Linux, CUDA required
+orateur setup --backend metal   # Apple Silicon
+orateur setup --backend cpu     # PyPI CPU wheel
+orateur setup --force           # reinstall STT stack
 ```
 
-For development, prefix with `uv run`:
+GPU builds can take several minutes. On macOS, Xcode Command Line Tools are required.
+
+---
+
+## Quickshell panel
+
+If [Quickshell](https://quickshell.org/) is installed, **`orateur setup`** installs **`~/.config/quickshell/orateur/`** and can write **`orateur_bin_path`** for minimal-`PATH` environments.
 
 ```bash
-uv run orateur run
-uv run orateur transcribe
-```
-
-### Quickshell
-
-If [Quickshell](https://quickshell.org/) is installed, `orateur setup` installs the panel under **`~/.config/quickshell/orateur/`** and writes **`~/.config/quickshell/orateur_bin_path`** (handy if you run **`orateur ui`** or **`orateur`** from scripts where `PATH` is minimal).
-
-```bash
-orateur setup          # refresh panel + launcher path file
 quickshell -c orateur
 ```
 
-**How the bar gets events:** **`orateur run`** (including systemd) appends one JSON object per line to **`~/.cache/orateur/ui_events.jsonl`**. The panel runs **`tail -n0 -F`** on that file, so **no second Orateur process** is needed for the UI. Whisper/TTS load **once** in the service.
+**`orateur run`** appends one JSON object per line to **`~/.cache/orateur/ui_events.jsonl`**; the panel uses **`tail -F`** on that file, so no second Orateur process is needed for the UI.
 
-Restart **`orateur`** after upgrading so the JSONL file is recreated; restart **Quickshell** after changing the panel QML. You need **`tail`** in `PATH` (standard on Linux).
+- **`quickshell_autostart`** in **`config.json`** — spawn **`quickshell -c orateur`** from **`orateur run`**
+- **`ui_events_mirror`** — set to **`false`** to stop writing **`ui_events.jsonl`** (disables external UIs)
+- **Hyprland / multiple monitors** — the bar follows the focused output when Hyprland integration is available
 
-The panel shows recording/TTS preview with waveform and duration estimate.
+**Experimental:** cross-platform overlay in **`desktop/`** (same JSONL). See **`desktop/README.md`**.
 
-**Tauri overlay (experimental):** a cross-platform window that reads the same JSONL file is in **`desktop/`**. See **`desktop/README.md`**.
+---
 
-**Multiple monitors (Hyprland):** The bar uses a single layer surface on the **focused** Hyprland output (`import Quickshell.Hyprland`). When focus moves to another monitor, the panel follows. Your Quickshell package must include Hyprland integration (typical on Arch/AUR). On a single screen, or if Hyprland cannot match outputs, the first Quickshell screen is used.
+## Systemd (user service)
 
-**FIFO / `orateur ui` (optional):** To drive recording from **`orateur ui-send`** instead of shortcuts, run **`orateur ui`** or **`orateur ui --events-only`** in a terminal; it uses **`~/.cache/orateur/cmd.fifo`**. That path is separate from **`ui_events.jsonl`**.
-
-**With `orateur run` (e.g. systemd):** **`ui_events_mirror`** (default **`true`**) controls writing **`ui_events.jsonl`**. Set it to **`false`** to disable external UI updates (Quickshell panel, Tauri overlay, etc.).
-
-**Auto-start the panel:** set **`quickshell_autostart`** to **`true`** in **`config.json`**. Then **`orateur run`** spawns **`quickshell -c orateur`** after shortcuts are ready and stops it on exit. Leave **`false`** (default) if you launch Quickshell yourself or use another shell integration, to avoid two instances.
-
-### Systemd (user service)
-
-Run the shortcut loop (`orateur run`) in the background so global shortcuts work without a terminal.
-
-**Install, enable, and start** — from a git checkout the service uses the repo launcher (`./bin/orateur run`); if only `orateur` is on your `PATH` (e.g. distro package), `ExecStart` is `orateur run`:
+Run **`orateur run`** in the background so shortcuts work without a terminal:
 
 ```bash
-orateur systemd install
-```
-
-This writes `~/.config/systemd/user/orateur.service`, reloads systemd, enables the unit for your user session, and starts it.
-
-**Desktop notifications:** when **`orateur run`** is ready (shortcuts active), a low-urgency notification is sent; another when the process shuts down. This uses **`notify-send`** (install **`libnotify`** on Arch). Set **`desktop_notifications`** to **`false`** in **`config.json`**, or **`ORATEUR_NO_NOTIFY=1`** in the environment, to disable.
-
-**Start when you log in (typical “at boot”):** the unit is **`WantedBy=graphical-session.target`**, so it starts with your **user** session once a graphical session exists (after login to Hyprland, KDE, etc.). It does **not** run at firmware boot before login. After `orateur systemd install`, it stays enabled across reboots; verify with:
-
-```bash
-systemctl --user is-enabled orateur.service
-```
-
-**PATH and Wayland:** user services sometimes have a minimal **`PATH`**. If **`quickshell_autostart`** fails with “not found”, add a drop-in (example paths—adjust for your install):
-
-```bash
-systemctl --user edit orateur.service
-```
-
-```ini
-[Service]
-Environment=PATH=/usr/local/bin:/usr/bin:/bin
-```
-
-Then **`systemctl --user daemon-reload`** and **`orateur systemd restart`**.
-
-**Check status** or **restart** after config changes:
-
-```bash
+orateur systemd install    # writes ~/.config/systemd/user/orateur.service, enable + start
 orateur systemd status
 orateur systemd restart
 ```
 
-The unit is ordered after **PipeWire** and **graphical-session** so audio and your GUI session are up. Run **`orateur setup`** (or equivalent) so STT/TTS are ready, and keep **`~/.config/orateur/config.json`** in order.
+The unit is **`WantedBy=graphical-session.target`** (starts with your graphical session, not at firmware boot). If **`quickshell`** is missing from the service **`PATH`**, add a drop-in with **`systemctl --user edit orateur.service`**.
 
-**Quickshell:** run **`quickshell -c orateur`** yourself, or set **`quickshell_autostart`** so **`orateur run`** starts it (see above). With **`ui_events_mirror`** enabled (default), the service and any UI that tails **`ui_events.jsonl`** stay in sync when both run.
+Desktop notifications on ready/shutdown use **`notify-send`** (disable via **`desktop_notifications`** or **`ORATEUR_NO_NOTIFY=1`**).
 
-**Development** (`uv`):
+---
 
-```bash
-uv run orateur systemd install
-```
+## Configuration & MCP
 
-Optional: set **`ORATEUR_ROOT`** to the repository root if the install command should resolve `config/orateur.service` from a specific path.
+- **Config file:** **`~/.config/orateur/config.json`** — **`orateur config init`** / **`orateur config show`**
+- **MCP:** define **`mcpServers`** (stdio) and optionally **`mcp_tools_url`** (SSE); list with **`orateur mcp list`**
 
-## Configuration
-
-Config: `~/.config/orateur/config.json`
-
-```bash
-orateur config init
-orateur config show
-```
-
-### UI events mirroring
-
-| Key | Default | Meaning |
-|-----|---------|---------|
-| `ui_events_mirror` | `true` | `orateur run` appends UI events to **`~/.cache/orateur/ui_events.jsonl`** for any client (Quickshell `tail -F`, Tauri **`desktop/`**, scripts). |
-| `quickshell_autostart` | `false` | If **`true`**, `orateur run` runs **`quickshell -c orateur`** as a child process and stops it on shutdown. |
-
-The deprecated key **`quickshell_ui_mirror`** is still read once on load and migrated to **`ui_events_mirror`**, then removed from the in-memory config.
-
-### MCP tools (Ollama)
-
-MCP servers provide tools that Ollama can call during STS. Define them in `mcpServers` (stdio) and optionally `mcp_tools_url` (SSE). All tools are passed to the LLM; when it returns tool calls, they are executed via MCP and the results fed back.
+Example:
 
 ```json
 {
   "mcpServers": {
-    "weather-forecast": {
-      "command": "uvx",
-      "args": ["weather-forecast-server"]
-    }
-  },
-  "mcp_tools_url": "http://localhost:8050/sse"
+    "example": { "command": "uvx", "args": ["some-mcp-server"] }
+  }
 }
 ```
 
-- **mcpServers**: Named stdio servers with `command` and `args` (Cursor-compatible)
-- **mcp_tools_url**: Optional SSE URL for an MCP tool server
+The deprecated key **`quickshell_ui_mirror`** is migrated once to **`ui_events_mirror`**.
 
-List configured servers with `orateur mcp list`.
+---
 
 ## Stopping
 
-- **Ctrl+C** in the terminal stops `orateur run`
-- **Systemd**: `systemctl --user stop orateur.service` (or `orateur systemd restart` after edits)
-- If `kill <pid>` doesn't work: kill the Python process (the one with higher memory in `ps aux`), or use `pkill -f "orateur run"` to stop all
+- **Ctrl+C** in the terminal running **`orateur run`**
+- **Systemd:** **`systemctl --user stop orateur.service`** or **`orateur systemd restart`** after config changes
+- If needed: **`pkill -f "orateur run"`** (avoid killing unrelated processes)
+
+---
+
+## Releasing (maintainers)
+
+Use the **[Release](.github/workflows/release.yml)** workflow so versions stay aligned across **`pyproject.toml`**, **`uv.lock`**, desktop pins, and **`install.sh`**. It runs [`scripts/sync_version_for_release.py`](scripts/sync_version_for_release.py), builds the wheel, and publishes the tag. Locally: **`python3 scripts/sync_version_for_release.py <semver>`** then **`uv lock`** and commit.
