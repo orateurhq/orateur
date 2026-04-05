@@ -2,11 +2,14 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 
 class TTSBackend(ABC):
     """Abstract base class for Text-to-Speech backends."""
+
+    def __init__(self, config: object) -> None:
+        """Subclasses store ``config`` as needed."""
 
     @abstractmethod
     def initialize(self, config) -> bool:
@@ -36,6 +39,7 @@ class TTSBackend(ABC):
         text: str,
         voice: Optional[str] = None,
         volume: Optional[float] = None,
+        level_callback: Optional[Callable[[float], None]] = None,
     ) -> bool:
         """
         Synthesize and play audio. Default implementation: synthesize then play file.
@@ -48,6 +52,7 @@ class TTSBackend(ABC):
     def _play_file(self, wav_path: Path, volume: Optional[float] = None) -> bool:
         """Play a WAV file. Override for streaming playback."""
         import subprocess
+
         vol = 1.0 if volume is None else max(0.1, min(1.0, float(volume)))
         for player, cmd in [
             ("pw-play", ["pw-play", "--volume", str(int(vol * 100)), str(wav_path)]),

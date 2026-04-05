@@ -16,8 +16,14 @@ from .base import TTSBackend
 log = logging.getLogger(__name__)
 
 POCKET_TTS_VOICES = [
-    "alba", "marius", "javert", "jean", "fantine",
-    "cosette", "eponine", "azelma",
+    "alba",
+    "marius",
+    "javert",
+    "jean",
+    "fantine",
+    "cosette",
+    "eponine",
+    "azelma",
 ]
 
 
@@ -25,6 +31,7 @@ class PocketTTSBackend(TTSBackend):
     """Pocket TTS text-to-speech."""
 
     def __init__(self, config):
+        super().__init__(config)
         self.config = config
         self._model = None
         self._voice_state_cache = {}
@@ -41,6 +48,7 @@ class PocketTTSBackend(TTSBackend):
         self.volume = max(0.1, min(1.0, float(config.get_setting("tts_volume", 1.0))))
         try:
             from pocket_tts import TTSModel
+
             self._model = TTSModel.load_model()
             self.ready = True
             log.info("Pocket TTS ready - voice: %s", self.voice)
@@ -54,8 +62,11 @@ class PocketTTSBackend(TTSBackend):
 
     def _get_voice_state(self, voice: Optional[str] = None):
         voice = voice or self.voice
+        model = self._model
+        if model is None:
+            raise RuntimeError("Pocket TTS model not loaded")
         if voice not in self._voice_state_cache:
-            self._voice_state_cache[voice] = self._model.get_state_for_audio_prompt(voice)
+            self._voice_state_cache[voice] = model.get_state_for_audio_prompt(voice)
         return self._voice_state_cache[voice]
 
     def stop_playback(self) -> None:
@@ -73,13 +84,50 @@ class PocketTTSBackend(TTSBackend):
         # pipe on macOS when Homebrew ffplay is on PATH. WAV + afplay is reliable instead.
         if sys.platform == "darwin":
             return None
+        model = self._model
+        if model is None:
+            return None
         vol = max(0.1, min(1.0, float(volume)))
-        sr = str(self._model.sample_rate)
+        sr = str(model.sample_rate)
         for check, cmd in [
-            ("pw-play", ["pw-play", "-a", "-", "--rate", sr, "--channels", "1", "--format", "s16", "--volume", str(vol)]),
+            (
+                "pw-play",
+                [
+                    "pw-play",
+                    "-a",
+                    "-",
+                    "--rate",
+                    sr,
+                    "--channels",
+                    "1",
+                    "--format",
+                    "s16",
+                    "--volume",
+                    str(vol),
+                ],
+            ),
             ("paplay", ["paplay", "--raw", "--format=s16le", f"--rate={sr}", "--channels=1", "-"]),
             ("aplay", ["aplay", "-q", "-t", "raw", "-f", "S16_LE", "-r", sr, "-c", "1", "-"]),
-            ("ffplay", ["ffplay", "-nodisp", "-autoexit", "-loglevel", "error", "-f", "s16le", "-ar", sr, "-ac", "1", "-volume", str(int(vol * 100)), "-i", "pipe:0"]),
+            (
+                "ffplay",
+                [
+                    "ffplay",
+                    "-nodisp",
+                    "-autoexit",
+                    "-loglevel",
+                    "error",
+                    "-f",
+                    "s16le",
+                    "-ar",
+                    sr,
+                    "-ac",
+                    "1",
+                    "-volume",
+                    str(int(vol * 100)),
+                    "-i",
+                    "pipe:0",
+                ],
+            ),
         ]:
             if shutil.which(check):
                 return cmd
@@ -98,7 +146,9 @@ class PocketTTSBackend(TTSBackend):
             voice_state = self._get_voice_state(voice)
             audio = self._model.generate_audio(voice_state, text)
             import scipy.io.wavfile
+
             from ..paths import TEMP_DIR
+
             TEMP_DIR.mkdir(parents=True, exist_ok=True)
             out_path = TEMP_DIR / "tts_output.wav"
             arr = audio.numpy() if hasattr(audio, "numpy") else audio
@@ -144,6 +194,10 @@ class PocketTTSBackend(TTSBackend):
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
+            stdin = proc.stdin
+            if stdin is None:
+                log.warning("Pocket TTS: player has no stdin pipe")
+                return False
             with self._playback_lock:
                 self._playback_proc = proc
             interrupted = False
@@ -160,19 +214,19 @@ class PocketTTSBackend(TTSBackend):
                         arr = (np.clip(arr, -1.0, 1.0) * 32767).astype(np.int16)
                     if level_callback is not None and len(arr) > 0:
                         float_arr = arr.astype(np.float32) / 32768.0
-                        rms = float(np.sqrt(np.mean(float_arr ** 2)))
+                        rms = float(np.sqrt(np.mean(float_arr**2)))
                         try:
                             level_callback(rms)
                         except Exception as e:
                             log.debug("level_callback error: %s", e)
                     try:
-                        proc.stdin.write(arr.tobytes())
-                        proc.stdin.flush()
+                        stdin.write(arr.tobytes())
+                        stdin.flush()
                     except BrokenPipeError:
                         interrupted = True
                         break
                 try:
-                    proc.stdin.close()
+                    stdin.close()
                 except Exception:
                     pass
                 if interrupted or self._stop_event.is_set():

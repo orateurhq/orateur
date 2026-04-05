@@ -4,7 +4,7 @@ import copy
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from .paths import CONFIG_DIR, CONFIG_FILE
 
@@ -105,5 +105,6 @@ class ConfigManager:
     def get_temp_directory(self) -> Path:
         """Get the temporary directory for audio files."""
         from .paths import TEMP_DIR
+
         TEMP_DIR.mkdir(parents=True, exist_ok=True)
         return TEMP_DIR

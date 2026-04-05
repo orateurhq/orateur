@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from .paths import VENV_DIR, PYWHISPERCPP_SRC_DIR
+from .paths import PYWHISPERCPP_SRC_DIR, VENV_DIR
 
 log = logging.getLogger(__name__)
 
@@ -501,11 +501,7 @@ def _run_venv_pip(args: list[str], force: bool = False) -> bool:
     if not pip_bin:
         log.error("No pip found. Run from project with uv: uv run orateur setup")
         return False
-    cmd = (
-        [str(pip_bin), "install", _PIP_BREAK_SYSTEM]
-        + (["--force-reinstall"] if force else [])
-        + args
-    )
+    cmd = [str(pip_bin), "install", _PIP_BREAK_SYSTEM] + (["--force-reinstall"] if force else []) + args
     try:
         result = subprocess.run(cmd, timeout=120)
         return result.returncode == 0

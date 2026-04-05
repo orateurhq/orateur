@@ -1,5 +1,6 @@
 """pywhispercpp STT backend."""
 
+import importlib
 import logging
 import sys
 from pathlib import Path
@@ -26,6 +27,7 @@ class PyWhisperCppBackend(STTBackend):
     """Whisper via pywhispercpp (local CPU, or GPU via CUDA / Metal / Vulkan per build)."""
 
     def __init__(self, config):
+        super().__init__(config)
         self.config = config
         self._model = None
         self._current_model = None
@@ -38,9 +40,10 @@ class PyWhisperCppBackend(STTBackend):
 
         try:
             try:
-                from pywhispercpp.model import Model
+                _pwm = importlib.import_module("pywhispercpp.model")
             except ImportError:
-                from pywhispercpp import Model
+                _pwm = importlib.import_module("pywhispercpp")
+            Model = getattr(_pwm, "Model")
             from pywhispercpp.constants import MODELS_DIR
 
             # redirect_whispercpp_logs_to=sys.stderr to see GPU allocation logs (e.g. "CUDA0 total size")
@@ -65,6 +68,7 @@ class PyWhisperCppBackend(STTBackend):
                 whisper_models_dir(),
             )
             import traceback
+
             traceback.print_exc()
             return False
 

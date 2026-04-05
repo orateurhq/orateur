@@ -50,10 +50,7 @@ def _has_mcp_tools(config: Any) -> bool:
     """Check if any MCP tool servers are configured."""
     servers = config.get_setting("mcpServers") or {}
     url = config.get_setting("mcp_tools_url")
-    return (
-        (isinstance(servers, dict) and len(servers) > 0)
-        or (url and isinstance(url, str) and url.strip())
-    )
+    return (isinstance(servers, dict) and len(servers) > 0) or (url and isinstance(url, str) and url.strip())
 
 
 @asynccontextmanager
@@ -63,7 +60,7 @@ async def mcp_connections(config: Any):
     Uses: async with stdio_client(params) as (read, write), ClientSession(read, write).
     """
     from mcp import ClientSession
-    from mcp.client.stdio import stdio_client, StdioServerParameters
+    from mcp.client.stdio import StdioServerParameters, stdio_client
 
     connections: dict[str, Any] = {}  # server_name -> session
     tool_to_server: dict[str, str] = {}
@@ -86,9 +83,7 @@ async def mcp_connections(config: Any):
                         **os.environ,
                         **{str(k): str(v) for k, v in env_cfg.items()},
                     }
-                    params = StdioServerParameters(
-                        command=str(cmd), args=args, env=merged_env
-                    )
+                    params = StdioServerParameters(command=str(cmd), args=args, env=merged_env)
                 else:
                     params = StdioServerParameters(command=str(cmd), args=args)
                 try:
@@ -134,9 +129,7 @@ async def mcp_connections(config: Any):
                     log.warning("MCP list_tools failed for '%s': %s", server_name, e)
             return (ollama_tools, tool_to_server)
 
-        async def call_tool(
-            server_name: str, tool_name: str, arguments: dict[str, Any] | None
-        ) -> str:
+        async def call_tool(server_name: str, tool_name: str, arguments: dict[str, Any] | None) -> str:
             if server_name not in connections:
                 return f"Error: server '{server_name}' not connected"
             session = connections[server_name]

@@ -6,8 +6,9 @@
 # from . import _cuda_env  # noqa: F401
 
 # Configure logging before any other orateur imports
-from . import log
-log.setup_logging()
+from . import log as log_config
+
+log_config.setup_logging()
 
 import argparse
 import json
@@ -21,15 +22,15 @@ from pathlib import Path
 from . import __version__
 from .config import ConfigManager
 
-log = logging.getLogger(__name__)
-from .paths import CONFIG_DIR, CONFIG_FILE
-from .stt import get_stt_backend, list_stt_backends
-from .tts import get_tts_backend, list_tts_backends
-from .llm import get_llm_backend, is_llm_disabled, list_llm_backends
+logger = logging.getLogger(__name__)
 from .audio_capture import AudioCapture
-from .sts_pipeline import run_sts
-from .text_injector import TextInjector
+from .llm import get_llm_backend, is_llm_disabled, list_llm_backends
 from .main import _get_text_from_selection, run
+from .paths import CONFIG_FILE
+from .sts_pipeline import run_sts
+from .stt import get_stt_backend, list_stt_backends
+from .text_injector import TextInjector
+from .tts import get_tts_backend, list_tts_backends
 
 
 def cmd_run(args):
@@ -44,11 +45,11 @@ def cmd_speak(args):
     if not text:
         text = _get_text_from_selection(config)
     if not text:
-        log.error("No text to speak")
+        logger.error("No text to speak")
         return 1
     tts = get_tts_backend(config.get_setting("tts_backend", "pocket_tts"), config)
     if not tts or not tts.is_ready():
-        log.error("TTS not ready")
+        logger.error("TTS not ready")
         return 1
     tts.synthesize_and_play(text)
     return 0
@@ -59,47 +60,50 @@ def cmd_transcribe(args):
     config = ConfigManager()
     stt = get_stt_backend(config.get_setting("stt_backend", "pywhispercpp"), config)
     if not stt or not stt.is_ready():
-        log.error("STT not ready")
+        logger.error("STT not ready")
         return 1
     audio = AudioCapture(config=config)
-    log.info("Recording... (Ctrl+C to stop)")
+    logger.info("Recording... (Ctrl+C to stop)")
     try:
         audio.start_recording()
         while True:
             import time
+
             time.sleep(0.5)
     except KeyboardInterrupt:
         pass
-    log.info("Stopping...")
+    logger.info("Stopping...")
     # Run stop_recording in a thread so main thread stays responsive to Ctrl+C
     result: list = []
+
     def _run_stop():
         try:
             result.append(audio.stop_recording())
         except Exception as e:
             result.append(e)
+
     worker = threading.Thread(target=_run_stop, daemon=True)
     worker.start()
     try:
         while worker.is_alive():
             worker.join(timeout=0.2)
     except KeyboardInterrupt:
-        log.info("Stopping... (please wait)")
+        logger.info("Stopping... (please wait)")
         worker.join(timeout=5.0)
     data = result[0] if result else None
     if isinstance(data, BaseException):
         raise data
     if data is None:
-        log.error("No audio")
+        logger.error("No audio")
         return 1
-    log.info("Transcribing...")
+    logger.info("Transcribing...")
     text = stt.transcribe(data)
     if not text or not text.strip():
-        log.error("No transcription")
+        logger.error("No transcription")
         return 1
     injector = TextInjector(config)
     if not injector.inject_text(text):
-        log.warning("Could not paste - text copied to clipboard")
+        logger.warning("Could not paste - text copied to clipboard")
     print(text)
     return 0
 
@@ -111,41 +115,44 @@ def cmd_sts(args):
     tts = get_tts_backend(config.get_setting("tts_backend", "pocket_tts"), config)
     llm_name = config.get_setting("llm_backend", "ollama")
     if is_llm_disabled(llm_name):
-        log.error("STS needs an LLM; set llm_backend to ollama (currently %s)", llm_name)
+        logger.error("STS needs an LLM; set llm_backend to ollama (currently %s)", llm_name)
         return 1
     llm = get_llm_backend(llm_name, config)
     if not all([stt and stt.is_ready(), tts and tts.is_ready(), llm and llm.is_ready()]):
-        log.error("STT, TTS, or LLM not ready")
+        logger.error("STT, TTS, or LLM not ready")
         return 1
     audio = AudioCapture(config=config)
-    log.info("Recording for STS... (Ctrl+C to stop)")
+    logger.info("Recording for STS... (Ctrl+C to stop)")
     try:
         audio.start_recording()
         while True:
             import time
+
             time.sleep(0.5)
     except KeyboardInterrupt:
         pass
-    log.info("Stopping...")
+    logger.info("Stopping...")
     result: list = []
+
     def _run_stop():
         try:
             result.append(audio.stop_recording())
         except Exception as e:
             result.append(e)
+
     worker = threading.Thread(target=_run_stop, daemon=True)
     worker.start()
     try:
         while worker.is_alive():
             worker.join(timeout=0.2)
     except KeyboardInterrupt:
-        log.info("Stopping... (please wait)")
+        logger.info("Stopping... (please wait)")
         worker.join(timeout=5.0)
     data = result[0] if result else None
     if isinstance(data, BaseException):
         raise data
     if data is None:
-        log.error("No audio")
+        logger.error("No audio")
         return 1
     run_sts(config, data, stt=stt, tts=tts, llm=llm)
     return 0
@@ -281,17 +288,19 @@ def cmd_ui(args):
 
 def cmd_ui_send(args):
     """Send a JSON command to the UI daemon (reads from stdin or first arg)."""
-    from .paths import CMD_FIFO, CACHE_DIR
     import sys as _sys
+
+    from .paths import CACHE_DIR, CMD_FIFO
+
     data = getattr(args, "json_data", None) or ""
     if not data:
         data = _sys.stdin.read().strip()
     if not data:
-        log.error("No JSON data (pass as arg or stdin)")
+        logger.error("No JSON data (pass as arg or stdin)")
         return 1
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     if not CMD_FIFO.exists():
-        log.error("UI daemon not running (FIFO not found). Run 'orateur ui' first.")
+        logger.error("UI daemon not running (FIFO not found). Run 'orateur ui' first.")
         return 1
     try:
         with open(CMD_FIFO, "w", encoding="utf-8") as f:
@@ -299,22 +308,22 @@ def cmd_ui_send(args):
             if not data.endswith("\n"):
                 f.write("\n")
     except OSError as e:
-        log.error("Failed to write to FIFO: %s", e)
+        logger.error("Failed to write to FIFO: %s", e)
         return 1
     return 0
 
 
 def cmd_setup(args):
     """Install GPU-accelerated pywhispercpp (CUDA, Metal, or PyPI CPU)."""
+    from .install_quickshell import install_quickshell
     from .install_stt import (
-        install_pywhispercpp,
         _build_pywhispercpp_cuda_from_source,
         _build_pywhispercpp_metal_from_source,
         _is_apple_silicon,
         _is_linux_x86_64,
         download_whisper_model,
+        install_pywhispercpp,
     )
-    from .install_quickshell import install_quickshell
 
     force = getattr(args, "force", False)
     if getattr(args, "build_from_source", False):
@@ -323,15 +332,13 @@ def cmd_setup(args):
         elif _is_linux_x86_64():
             ok = _build_pywhispercpp_cuda_from_source(force=force)
         else:
-            log.error(
-                "--build-from-source is supported on Linux x86_64 (CUDA) or macOS Apple Silicon (Metal)"
-            )
+            logger.error("--build-from-source is supported on Linux x86_64 (CUDA) or macOS Apple Silicon (Metal)")
             return 1
         if not ok:
             return 1
         config = ConfigManager()
         if not download_whisper_model(config.get_setting("stt_model", "base")):
-            log.warning("Whisper model download failed; first run will try again (needs network)")
+            logger.warning("Whisper model download failed; first run will try again (needs network)")
         install_quickshell()
         return 0
 
@@ -342,7 +349,7 @@ def cmd_setup(args):
     if ok:
         config = ConfigManager()
         if not download_whisper_model(config.get_setting("stt_model", "base")):
-            log.warning("Whisper model download failed; first run will try again (needs network)")
+            logger.warning("Whisper model download failed; first run will try again (needs network)")
     install_quickshell()
     return 0 if ok else 1
 

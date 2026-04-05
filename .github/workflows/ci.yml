@@ -25,6 +25,14 @@ jobs:
       - name: Install dependencies
         run: uv sync --dev
 
+      - name: Ruff lint and format
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Type check (ty)
+        run: uv run ty check
+
       - name: Build wheel
         run: uv build --wheel
 

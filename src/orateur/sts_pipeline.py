@@ -7,8 +7,8 @@ from typing import Optional
 from .stt import get_stt_backend
 
 log = logging.getLogger(__name__)
-from .tts import get_tts_backend
 from .llm import get_llm_backend
+from .tts import get_tts_backend
 
 
 def run_sts(

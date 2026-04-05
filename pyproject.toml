@@ -42,6 +42,33 @@ dev = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.ruff]
+line-length = 120
+exclude = ["*.ipynb"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "B006"]
+ignore = ["E203", "W293"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["orateur"]
+
+[tool.ruff.lint.per-file-ignores]
+# Configure logging before importing sibling packages that may log on import.
+"src/orateur/cli.py" = ["E402"]
+"src/orateur/main.py" = ["E402"]
+"src/orateur/sts_pipeline.py" = ["E402"]
+
+[tool.ty.src]
+include = ["src"]
+
+[tool.ty.environment]
+root = ["./src"]
+
+[tool.ty.analysis]
+# Optional dependency on non-Linux platforms (see project optional deps).
+allowed-unresolved-imports = ["pynput.**"]
+
 # Omit explicit hatch `packages` paths: `python -m build` builds the wheel from the sdist, where
 # sources live as `orateur/…` (not `src/orateur`), so a `src/orateur` override yields an empty wheel.
 

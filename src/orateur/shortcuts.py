@@ -119,6 +119,7 @@ if sys.platform == "linux":
 
     import evdev
     from evdev import InputDevice, categorize, ecodes
+    from evdev.events import KeyEvent
 
     def _parse_shortcut(s: str) -> frozenset:
         s = s.lower().strip().replace("+", " ").replace("-", " ")
@@ -219,6 +220,8 @@ if sys.platform == "linux":
                             try:
                                 kev = categorize(event)
                             except KeyError:
+                                continue
+                            if not isinstance(kev, KeyEvent):
                                 continue
                             if kev.keystate == 1:
                                 self.pressed_keys.add(event.code)

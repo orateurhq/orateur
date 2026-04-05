@@ -30,7 +30,7 @@ def audio_to_levels(audio: np.ndarray, num_bars: int = 60) -> list[float]:
             start = i * seg_len
             end = min(start + seg_len, n)
             seg = audio[start:end]
-            levels[i] = float(np.sqrt(np.mean(seg ** 2)))
+            levels[i] = float(np.sqrt(np.mean(seg**2)))
     else:
         seg_len = n // num_bars
         levels = np.zeros(num_bars, dtype=np.float32)
@@ -39,7 +39,7 @@ def audio_to_levels(audio: np.ndarray, num_bars: int = 60) -> list[float]:
             end = (i + 1) * seg_len if i < num_bars - 1 else n
             seg = audio[start:end]
             if len(seg) > 0:
-                levels[i] = float(np.sqrt(np.mean(seg ** 2)))
+                levels[i] = float(np.sqrt(np.mean(seg**2)))
 
     # Normalize to 0-1 (clip and scale by max)
     max_val = float(np.max(levels))

@@ -35,13 +35,15 @@ def _message_to_dict(msg: Any) -> dict[str, Any]:
         for tc in msg.tool_calls:
             fn = getattr(tc, "function", None)
             if fn:
-                d["tool_calls"].append({
-                    "type": "function",
-                    "function": {
-                        "name": getattr(fn, "name", ""),
-                        "arguments": getattr(fn, "arguments", {}),
-                    },
-                })
+                d["tool_calls"].append(
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": getattr(fn, "name", ""),
+                            "arguments": getattr(fn, "arguments", {}),
+                        },
+                    }
+                )
     return d
 
 
@@ -49,6 +51,7 @@ class OllamaBackend(LLMBackend):
     """Ollama local LLM with optional MCP tools."""
 
     def __init__(self, config):
+        super().__init__(config)
         self.config = config
         self.ready = False
 
@@ -56,6 +59,7 @@ class OllamaBackend(LLMBackend):
         self.config = config
         try:
             import ollama
+
             ollama.list()
             self.ready = True
             log.info("Ollama ready")
@@ -78,9 +82,7 @@ class OllamaBackend(LLMBackend):
 
         if _has_mcp_tools(self.config):
             try:
-                return asyncio.run(
-                    self._generate_with_tools(user_text, system_prompt, model_override)
-                )
+                return asyncio.run(self._generate_with_tools(user_text, system_prompt, model_override))
             except Exception as e:
                 log.warning("MCP tools failed: %s", e)
         return self._generate_simple(user_text, system_prompt, model_override)
@@ -171,11 +173,13 @@ class OllamaBackend(LLMBackend):
                         result = await call_tool(server, name, args)
                         log.info("MCP tool %s returned %d chars", name, len(str(result)))
 
-                    messages.append({
-                        "role": "tool",
-                        "tool_name": name,
-                        "content": str(result),
-                    })
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_name": name,
+                            "content": str(result),
+                        }
+                    )
 
         log.warning("MCP tool-call loop hit max rounds (%d)", _MAX_TOOL_ROUNDS)
         return ""
@@ -186,11 +190,12 @@ class OllamaBackend(LLMBackend):
     def get_available_models(self) -> list[str]:
         try:
             import ollama
+
             base_url = self.config.get_setting("llm_base_url", "http://localhost:11434")
             client = ollama.Client(host=base_url)
             resp = client.list()
             if hasattr(resp, "models") and resp.models:
-                return [m.model for m in resp.models]
+                return [m.model for m in resp.models if m.model is not None]
             return []
         except Exception:
             return []

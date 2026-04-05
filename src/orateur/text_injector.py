@@ -41,6 +41,7 @@ class TextInjector:
             else:
                 try:
                     import pyperclip
+
                     pyperclip.copy(text)
                 except ImportError:
                     if shutil.which("xclip"):
@@ -59,13 +60,15 @@ class TextInjector:
                 if mode == "super":
                     subprocess.run(["ydotool", "key", "125:1", kp, kr, "125:0"], capture_output=True, timeout=5)
                 elif mode == "ctrl_shift":
-                    subprocess.run(["ydotool", "key", "29:1", "42:1", kp, kr, "42:0", "29:0"], capture_output=True, timeout=5)
+                    subprocess.run(
+                        ["ydotool", "key", "29:1", "42:1", kp, kr, "42:0", "29:0"],
+                        capture_output=True,
+                        timeout=5,
+                    )
                 else:
                     subprocess.run(["ydotool", "key", "29:1", kp, kr, "29:0"], capture_output=True, timeout=5)
             else:
-                log.warning(
-                    "No paste simulator (install ydotool on Linux, or run on macOS/Windows with pynput)"
-                )
+                log.warning("No paste simulator (install ydotool on Linux, or run on macOS/Windows with pynput)")
                 return False
             return True
         except Exception as e:

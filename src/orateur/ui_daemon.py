@@ -226,9 +226,7 @@ def _run_ui_daemon(*, events_only: bool = False) -> None:
             break
 
         if action in ("start_recording", "stop_recording", "speak"):
-            _emit_error(
-                "Events-only UI: use orateur run + shortcuts, or run `orateur ui` without --events-only"
-            )
+            _emit_error("Events-only UI: use orateur run + shortcuts, or run `orateur ui` without --events-only")
             continue
 
         _emit_error(f"Unknown command: {action}")

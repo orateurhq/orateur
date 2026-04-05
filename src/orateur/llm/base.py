@@ -7,6 +7,9 @@ from typing import Optional
 class LLMBackend(ABC):
     """Abstract base class for LLM backends (used in STS pipeline)."""
 
+    def __init__(self, config: object) -> None:
+        """Subclasses store ``config`` as needed."""
+
     @abstractmethod
     def initialize(self, config) -> bool:
         """Initialize the backend. Returns True on success."""

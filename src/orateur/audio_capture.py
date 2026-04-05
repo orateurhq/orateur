@@ -103,6 +103,7 @@ class AudioCapture:
 
     def _record_audio(self) -> None:
         try:
+
             def callback(indata, frames, time_info, status):
                 if status:
                     log.warning("Audio status: %s", status)
@@ -114,7 +115,7 @@ class AudioCapture:
                         self.audio_data.append(chunk)
                         cb = self._level_callback
                 if cb is not None and chunk is not None and len(chunk) > 0:
-                    rms = float(np.sqrt(np.mean(chunk ** 2)))
+                    rms = float(np.sqrt(np.mean(chunk**2)))
                     try:
                         cb(rms)
                     except Exception as e:

@@ -1,7 +1,5 @@
 """Main application loop for Orateur."""
 
-from . import _cuda_env  # noqa: F401 - sets LD_LIBRARY_PATH for CUDA/ROCm
-
 import logging
 import os
 import signal
@@ -9,21 +7,24 @@ import sys
 import threading
 import time
 
+from . import (
+    _cuda_env,  # noqa: F401 - sets LD_LIBRARY_PATH for CUDA/ROCm
+    quickshell_spawn,
+    ui_mirror,
+)
 from .audio_capture import AudioCapture
 from .audio_utils import audio_to_levels
-from . import ui_mirror
-from . import quickshell_spawn
 
 log = logging.getLogger(__name__)
-from .stt import get_stt_backend
-from .tts import get_tts_backend
+from . import log as log_config
+from .config import ConfigManager
+from .desktop_notify import notify as desktop_notify
 from .llm import get_llm_backend, is_llm_disabled
 from .shortcuts import ShortcutManager
-from .text_injector import TextInjector
-from .config import ConfigManager
 from .sts_pipeline import run_sts
-from .desktop_notify import notify as desktop_notify
-from . import log as log_config
+from .stt import get_stt_backend
+from .text_injector import TextInjector
+from .tts import get_tts_backend
 
 
 def _macos_get_text_via_selection_copy() -> str | None:
@@ -66,6 +67,7 @@ def _macos_get_text_via_selection_copy() -> str | None:
 def _get_text_from_selection(config) -> str:
     """Get text from primary selection or clipboard."""
     import subprocess
+
     if sys.platform == "darwin":
         sel = _macos_get_text_via_selection_copy()
         if sel is not None:
@@ -76,7 +78,12 @@ def _get_text_from_selection(config) -> str:
                 return r.stdout.decode("utf-8", errors="replace").strip()
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass
-    for cmd in [["wl-paste", "-p"], ["wl-paste"], ["xclip", "-selection", "primary", "-o"], ["xclip", "-selection", "clipboard", "-o"]]:
+    for cmd in [
+        ["wl-paste", "-p"],
+        ["wl-paste"],
+        ["xclip", "-selection", "primary", "-o"],
+        ["xclip", "-selection", "clipboard", "-o"],
+    ]:
         try:
             r = subprocess.run(cmd, capture_output=True, timeout=2)
             if r.returncode == 0 and r.stdout:
@@ -85,6 +92,7 @@ def _get_text_from_selection(config) -> str:
             continue
     try:
         import pyperclip
+
         return pyperclip.paste() or ""
     except ImportError:
         return ""

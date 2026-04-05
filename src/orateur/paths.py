@@ -1,6 +1,7 @@
 """Centralized path constants for Orateur with XDG Base Directory support."""
-from pathlib import Path
+
 import os
+from pathlib import Path
 
 HOME = Path.home()
 XDG_CONFIG_HOME = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config"))

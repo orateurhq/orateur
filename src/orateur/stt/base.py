@@ -9,6 +9,9 @@ import numpy as np
 class STTBackend(ABC):
     """Abstract base class for Speech-to-Text backends."""
 
+    def __init__(self, config: object) -> None:
+        """Subclasses store ``config`` as needed."""
+
     @abstractmethod
     def initialize(self, config) -> bool:
         """Initialize the backend. Returns True on success."""

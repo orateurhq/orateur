@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Bump release version across repo files. Reads current version from pyproject.toml."""
+
 from __future__ import annotations
 
 import json
