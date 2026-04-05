@@ -1,6 +1,7 @@
 __pycache__/
 .venv/
 dist/
+site/
 *.egg-info/
 # CI release workflow copies these to the repo root for packaging (not committed)
 /install.sh
