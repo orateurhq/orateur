@@ -1,7 +1,5 @@
 # Orateur
 
-![Orateur logo](logo.png)
-
 Local **speech-to-text** (Whisper), **text-to-speech** (Pocket TTS), and **speech-to-speech** (STT → Ollama → TTS), with optional **MCP tools**, **global shortcuts**, and a **status UI** (Quickshell panel or [Tauri desktop](desktop/) overlay).
 
 **Python 3.10+** is required; the `orateur` launcher refuses older interpreters.
