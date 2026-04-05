@@ -8,6 +8,8 @@ mod release_info;
 
 mod env_check;
 
+mod orateur_config;
+
 mod daemon;
 
 mod overlay_workspace;
@@ -19,7 +21,6 @@ use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::process::Child;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -30,6 +31,9 @@ use serde::Serialize;
 #[cfg(desktop)]
 use tauri::RunEvent;
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
+
+/// Set when the Orateur CLI is available (startup probe or install gate passed in the UI).
+static OVERLAY_INSTALL_GATE_PASSED: AtomicBool = AtomicBool::new(false);
 
 /// Matches Python `paths.py`: `XDG_CACHE_HOME/orateur`, default `~/.cache/orateur`.
 fn orateur_cache_dir(home: &Path) -> PathBuf {
@@ -172,6 +176,11 @@ fn set_check_orateur_cli_on_startup(app: AppHandle, enabled: bool) -> Result<(),
     daemon::set_check_orateur_cli_on_startup(&app, enabled)
 }
 
+#[tauri::command]
+fn set_overlay_install_gate_passed(passed: bool) {
+    OVERLAY_INSTALL_GATE_PASSED.store(passed, Ordering::SeqCst);
+}
+
 struct TailState {
     read_offset: u64,
     pending: String,
@@ -210,6 +219,9 @@ fn ensure_parent(path: &Path) {
 
 /// Show the overlay when `orateur run` mirrors activity triggered by global shortcuts.
 fn maybe_show_overlay_for_activity(app: &AppHandle, v: &serde_json::Value) {
+    if !OVERLAY_INSTALL_GATE_PASSED.load(Ordering::SeqCst) {
+        return;
+    }
     let Some(ev) = v.get("event").and_then(|e| e.as_str()) else {
         return;
     };
@@ -404,13 +416,26 @@ pub fn run() {
 
             app.manage(paths_arc);
 
-            let daemon_holder: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(None));
-            app.manage(daemon::DaemonHolder(daemon_holder.clone()));
+            let daemon_inner = Arc::new(daemon::DaemonHolderInner {
+                child: Mutex::new(None),
+                spawn_serial: Mutex::new(()),
+            });
+            app.manage(daemon::DaemonHolder(daemon_inner.clone()));
             {
                 let h = app.handle().clone();
-                let dh = daemon_holder.clone();
+                let dh = daemon_inner.clone();
                 std::thread::spawn(move || {
                     daemon::spawn_orateur_daemon_if_needed(&h, &dh);
+                });
+            }
+
+            {
+                let h_probe = app.handle().clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(Duration::from_millis(400));
+                    if env_check::orateur_cli_command(&h_probe).is_some() {
+                        OVERLAY_INSTALL_GATE_PASSED.store(true, Ordering::SeqCst);
+                    }
                 });
             }
 
@@ -420,17 +445,6 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             {
                 macos_overlay_panel::init_overlay_panel(app.handle())?;
-            }
-
-            #[cfg(all(desktop, debug_assertions))]
-            {
-                let h = app.handle().clone();
-                let h2 = h.clone();
-                let _ = h.run_on_main_thread(move || {
-                    if let Some(w) = h2.get_webview_window("overlay") {
-                        overlay_workspace::show_overlay_window(&w);
-                    }
-                });
             }
 
             Ok(())
@@ -449,9 +463,14 @@ pub fn run() {
             env_check::get_orateur_cli_release_info,
             get_check_orateur_cli_on_startup,
             set_check_orateur_cli_on_startup,
+            set_overlay_install_gate_passed,
             daemon::get_auto_start_daemon,
             daemon::set_auto_start_daemon,
             daemon::trigger_orateur_daemon,
+            daemon::restart_orateur_daemon,
+            orateur_config::read_orateur_config,
+            orateur_config::write_orateur_config_patch,
+            orateur_config::get_orateur_config_path,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

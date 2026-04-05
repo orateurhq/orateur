@@ -11,8 +11,22 @@ use tauri::{AppHandle, Manager};
 
 use crate::env_check::{self, run_cmd_timeout, SETUP_TIMEOUT};
 
+/// Serialized `orateur run` lifecycle: one spawn at a time, coordinated with [`kill_daemon`].
+#[derive(Debug)]
+pub struct DaemonHolderInner {
+    pub child: Mutex<Option<Child>>,
+    pub spawn_serial: Mutex<()>,
+}
+
 #[derive(Clone)]
-pub struct DaemonHolder(pub Arc<Mutex<Option<Child>>>);
+pub struct DaemonHolder(pub Arc<DaemonHolderInner>);
+
+fn child_still_running(child: &mut Child) -> bool {
+    match child.try_wait() {
+        Ok(None) => true,
+        Ok(Some(_)) | Err(_) => false,
+    }
+}
 
 fn orateur_data_dir(home: &Path) -> PathBuf {
     std::env::var_os("XDG_DATA_HOME")
@@ -150,15 +164,23 @@ pub fn set_check_orateur_cli_on_startup(app: &AppHandle, enabled: bool) -> Resul
     std::fs::write(&p, v).map_err(|e| e.to_string())
 }
 
-pub fn spawn_orateur_daemon_if_needed(app: &AppHandle, holder: &Arc<Mutex<Option<Child>>>) {
+pub fn spawn_orateur_daemon_if_needed(app: &AppHandle, holder: &Arc<DaemonHolderInner>) {
     if !is_auto_start_enabled(app) {
         return;
     }
 
+    let _spawn_guard = holder
+        .spawn_serial
+        .lock()
+        .expect("daemon spawn_serial mutex poisoned");
+
     {
-        let g = holder.lock().expect("daemon mutex poisoned");
-        if g.is_some() {
-            return;
+        let mut g = holder.child.lock().expect("daemon mutex poisoned");
+        if let Some(ref mut ch) = *g {
+            if child_still_running(ch) {
+                return;
+            }
+            *g = None;
         }
     }
 
@@ -178,7 +200,13 @@ pub fn spawn_orateur_daemon_if_needed(app: &AppHandle, holder: &Arc<Mutex<Option
 
     let mut run_cmd = match env_check::orateur_cli_command(app) {
         Some(c) => c,
-        None => return,
+        None => {
+            append_daemon_log(
+                &log_path,
+                "daemon: cannot spawn — `orateur` CLI not found (same resolution as install gate).",
+            );
+            return;
+        }
     };
     run_cmd.arg("run");
     run_cmd.stdin(Stdio::null());
@@ -206,15 +234,19 @@ pub fn spawn_orateur_daemon_if_needed(app: &AppHandle, holder: &Arc<Mutex<Option
     append_daemon_log(&log_path, "daemon: spawning `orateur run`…");
     match run_cmd.spawn() {
         Ok(child) => {
-            let mut g = holder.lock().expect("daemon mutex poisoned");
+            let mut g = holder.child.lock().expect("daemon mutex poisoned");
             *g = Some(child);
         }
         Err(e) => append_daemon_log(&log_path, &format!("daemon: spawn failed: {e}")),
     }
 }
 
-pub fn kill_daemon(holder: &Arc<Mutex<Option<Child>>>) {
-    let mut g = holder.lock().expect("daemon mutex poisoned");
+pub fn kill_daemon(holder: &Arc<DaemonHolderInner>) {
+    let _guard = holder
+        .spawn_serial
+        .lock()
+        .expect("daemon spawn_serial mutex poisoned");
+    let mut g = holder.child.lock().expect("daemon mutex poisoned");
     if let Some(mut c) = g.take() {
         let _ = c.kill();
         let _ = c.wait();
@@ -227,6 +259,18 @@ pub fn trigger_orateur_daemon(app: AppHandle, holder: tauri::State<DaemonHolder>
     let inner = holder.0.clone();
     let app2 = app.clone();
     std::thread::spawn(move || {
+        spawn_orateur_daemon_if_needed(&app2, &inner);
+    });
+    Ok(())
+}
+
+/// Kill the spawned `orateur run` child (if any) and spawn again when auto-start is enabled.
+#[tauri::command]
+pub fn restart_orateur_daemon(app: AppHandle, holder: tauri::State<DaemonHolder>) -> Result<(), String> {
+    let inner = holder.0.clone();
+    let app2 = app.clone();
+    std::thread::spawn(move || {
+        kill_daemon(&inner);
         spawn_orateur_daemon_if_needed(&app2, &inner);
     });
     Ok(())

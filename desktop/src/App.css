@@ -216,7 +216,7 @@ body.app--settings {
   display: block;
   width: 48px;
   height: auto;
-  margin: 0 0 14px;
+  margin: 0 auto 14px;
   object-fit: contain;
   border-radius: 8px;
 }
@@ -225,6 +225,7 @@ body.app--settings {
   margin: 0 0 12px;
   font-size: 1.1rem;
   font-weight: 600;
+  text-align: center;
 }
 
 .installGate__text {
@@ -277,6 +278,15 @@ body.app--settings {
   margin-bottom: 14px;
 }
 
+.installGate__actions--single {
+  justify-content: center;
+  margin-bottom: 0;
+}
+
+.installGate__actions--single .installGate__btn--primary {
+  min-width: 180px;
+}
+
 .installGate__btn {
   padding: 8px 16px;
   font-size: 0.9rem;
@@ -321,9 +331,107 @@ body.app--settings {
 /* —— Settings window —— */
 .settings {
   padding: 20px 22px 28px;
-  max-width: 560px;
+  max-width: 720px;
   margin: 0 auto;
   box-sizing: border-box;
+}
+
+.settings__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.settings__tab {
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  border-radius: 6px;
+  border: 1px solid #48464f;
+  background: #2b2930;
+  color: #cac4d0;
+  cursor: pointer;
+}
+
+.settings__tab:hover {
+  background: #35333a;
+}
+
+.settings__tab--active {
+  border-color: #4f46e5;
+  background: rgba(79, 70, 229, 0.25);
+  color: #e8e6ed;
+}
+
+.settings__textarea {
+  background: #2b2930;
+  border: 1px solid #48464f;
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: #e8e6ed;
+  font-size: 0.85rem;
+  font-family: ui-monospace, monospace;
+  resize: vertical;
+  min-height: 72px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.settings__shortcut-row {
+  margin-bottom: 14px;
+}
+
+.settings__shortcut-inputRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.settings__shortcut-inputRow .settings__input {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.settings__shortcut-hint {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: #a78bfa;
+}
+
+.settings__btn--recording {
+  background: rgba(79, 70, 229, 0.45);
+  border: 1px solid #6366f1;
+}
+
+.settings__save-msg {
+  margin: 0 0 12px;
+  font-size: 0.85rem;
+  color: #a8a29e;
+  line-height: 1.4;
+}
+
+.settings__save-msg--error {
+  color: #f87171;
+}
+
+.settings__restart-hint {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #3f3d45;
+}
+
+.settings__hint--systemd {
+  font-size: 0.78rem;
+  color: #9ca3af;
+  margin-top: 8px;
+}
+
+.settings__hint--sub {
+  margin: -4px 0 14px;
+  font-size: 0.78rem;
+  color: #9ca3af;
 }
 
 .settings__cli-banner {

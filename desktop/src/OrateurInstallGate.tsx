@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { invoke, isTauri } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
-const SNOOZE_KEY = "orateur_install_snoozed";
+const INSTALL_COMPLETE_EVENT = "orateur_install_complete";
 
 export type OrateurEnvCheck = {
   orateurInstalled: boolean;
@@ -79,10 +80,6 @@ export function OrateurInstallGate({ children }: { children: React.ReactNode }) 
         setPhase("passed");
         return;
       }
-      if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(SNOOZE_KEY) === "1") {
-        setPhase("passed");
-        return;
-      }
       setPhase("checking");
       try {
         await runCheck();
@@ -106,10 +103,38 @@ export function OrateurInstallGate({ children }: { children: React.ReactNode }) 
     })();
   }, [runCheck]);
 
-  const snooze = useCallback(() => {
-    sessionStorage.setItem(SNOOZE_KEY, "1");
-    setPhase("passed");
-  }, []);
+  /** Settings webview may finish install first — sync the other window (e.g. overlay). */
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    void listen(INSTALL_COMPLETE_EVENT, () => {
+      void runCheck();
+    }).then((fn) => {
+      unlisten = fn;
+    });
+    return () => {
+      unlisten?.();
+    };
+  }, [runCheck]);
+
+  /** Hide the native overlay window until the install gate passes (CLI available). */
+  useEffect(() => {
+    void (async () => {
+      if (!(await isTauri())) return;
+      const w = getCurrentWindow();
+      if ((await w.label) !== "overlay") return;
+      if (phase === "passed") return;
+      await w.hide().catch(() => {});
+    })();
+  }, [phase]);
+
+  /** Tell the backend the CLI is ready so JSONL activity may auto-show the overlay. */
+  useEffect(() => {
+    if (phase !== "passed") return;
+    void (async () => {
+      if (!(await isTauri())) return;
+      await invoke("set_overlay_install_gate_passed", { passed: true }).catch(() => {});
+    })();
+  }, [phase]);
 
   const runInstall = useCallback(async () => {
     setInstalling(true);
@@ -120,8 +145,10 @@ export function OrateurInstallGate({ children }: { children: React.ReactNode }) 
         const c = await invoke<OrateurEnvCheck>("check_orateur_environment");
         setCheck(c);
         if (c.orateurInstalled) {
+          void invoke("set_overlay_install_gate_passed", { passed: true }).catch(() => {});
           void invoke("trigger_orateur_daemon").catch(() => {});
           setPhase("passed");
+          void emit(INSTALL_COMPLETE_EVENT, null);
         } else {
           setInstallLog(
             (prev) =>
@@ -165,31 +192,20 @@ export function OrateurInstallGate({ children }: { children: React.ReactNode }) 
         <h2 id="installGate-title" className="installGate__title">
           {phase === "checking" ? "Checking…" : "Install Orateur"}
         </h2>
-        {phase === "checking" && (
-          <p className="installGate__text">
-            Looking for the <code>orateur</code> command and Python 3.10+.
-          </p>
-        )}
         {phase === "blocked" && check && (
           <>
-            <p className="installGate__text">
-              This desktop app only reads <code>ui_events.jsonl</code>. The <strong>orateur</strong> CLI
-              is not available on this system yet (or it is not on your <code>PATH</code>).
-            </p>
-            {check.detail ? <pre className="installGate__detail">{check.detail}</pre> : null}
             {preview?.usesBundledWheel ? (
-              <p className="installGate__hint installGate__text">Using offline bundle from the app.</p>
+              <p className="installGate__hint installGate__text">Offline bundle from the app.</p>
             ) : null}
             {!check.pythonOk && (
               <p className="installGate__warn">
-                Install <strong>Python 3.10+</strong> first (from python.org or your package manager), then
-                reopen this app.
+                Install <strong>Python 3.10+</strong> first, then reopen this app.
               </p>
             )}
             {installLog !== null && installLog !== "" && (
               <pre className="installGate__log installGate__log--scroll">{installLog}</pre>
             )}
-            <div className="installGate__actions">
+            <div className="installGate__actions installGate__actions--single">
               <button
                 type="button"
                 className="installGate__btn installGate__btn--primary"
@@ -198,15 +214,7 @@ export function OrateurInstallGate({ children }: { children: React.ReactNode }) 
               >
                 {installing ? "Installing…" : "Install"}
               </button>
-              <button type="button" className="installGate__btn" disabled={installing} onClick={snooze}>
-                Not now
-              </button>
             </div>
-            <p className="installGate__footer">
-              After install, the desktop app can run <code>orateur setup</code> (if STT is not ready) and{" "}
-              <code>orateur run</code> for you. Ensure <code>ui_events_mirror</code> is enabled in config
-              (default). You can turn this off under tray → Settings.
-            </p>
           </>
         )}
       </div>

@@ -301,27 +301,6 @@ fn version_at_least_310(s: &str) -> bool {
     major > 3 || (major == 3 && minor >= 10)
 }
 
-fn python_cmd_import_orateur(args: &[String]) -> Result<std::process::Output, String> {
-    let mut cmd = Command::new(&args[0]);
-    for a in args.iter().skip(1) {
-        cmd.arg(a);
-    }
-    cmd.arg("-c");
-    cmd.arg(
-        r#"import sys
-if sys.version_info < (3, 10):
-    sys.exit(2)
-try:
-    import orateur
-    print(getattr(orateur, "__version__", "?"))
-except ImportError:
-    sys.exit(1)
-sys.exit(0)
-"#,
-    );
-    run_cmd_timeout(cmd, CHECK_TIMEOUT, "import orateur")
-}
-
 /// Prepends typical user install locations so GUI apps find `~/.local/bin/orateur`.
 pub fn extended_path_for_orateur_home(home: &std::path::Path) -> String {
     let sep = if cfg!(windows) { ";" } else { ":" };
@@ -381,61 +360,17 @@ pub fn current_orateur_cli_semver(app: &AppHandle) -> Option<String> {
     parse_cli_version(&line)
 }
 
-fn orateur_module_version(py_args: &[String]) -> bool {
-    let mut cmd = Command::new(&py_args[0]);
-    for a in py_args.iter().skip(1) {
-        cmd.arg(a);
-    }
-    cmd.arg("-m");
-    cmd.arg("orateur.cli");
-    cmd.arg("--version");
-    let out = match run_cmd_timeout(cmd, CHECK_TIMEOUT, "python -m orateur.cli --version") {
-        Ok(o) => o,
-        Err(_) => return false,
-    };
-    out.status.success()
-}
-
-/// Command with `PATH` set for `orateur` or `python -m orateur.cli`, ready for subcommands like `run` / `setup`.
+/// `orateur` on PATH (including `~/.local/bin`), ready for subcommands like `run` / `setup`.
+/// Uses the same resolution as [`check_orateur_environment`] so the daemon can spawn whenever the gate passes.
 pub fn orateur_cli_command(app: &AppHandle) -> Option<Command> {
     let home = app.path().home_dir().ok()?;
     let path_env = extended_path_for_orateur_home(&home);
-
-    if orateur_cli_version_with_path(&home).is_some() {
-        let mut c = Command::new("orateur");
-        c.env("PATH", &path_env);
-        return Some(c);
-    }
-
-    let (_, py_args) = resolve_python_invocation()?;
-    let mut probe = Command::new(&py_args[0]);
-    for a in py_args.iter().skip(1) {
-        probe.arg(a);
-    }
-    probe.env("PATH", &path_env);
-    probe.arg("-c");
-    probe.arg(
-        r#"import sys
-if sys.version_info < (3, 10):
-    sys.exit(2)
-try:
-    import orateur
-except ImportError:
-    sys.exit(1)
-sys.exit(0)
-"#,
-    );
-    let out = run_cmd_timeout(probe, CHECK_TIMEOUT, "import orateur").ok()?;
-    if !out.status.success() {
+    let cli_ok = orateur_cli_version_with_path(&home).is_some()
+        || orateur_cli_version_on_path().is_some();
+    if !cli_ok {
         return None;
     }
-
-    let mut c = Command::new(&py_args[0]);
-    for a in py_args.iter().skip(1) {
-        c.arg(a);
-    }
-    c.arg("-m");
-    c.arg("orateur.cli");
+    let mut c = Command::new("orateur");
     c.env("PATH", &path_env);
     Some(c)
 }
@@ -468,7 +403,7 @@ pub fn check_orateur_environment(app: AppHandle) -> Result<OrateurEnvCheck, Stri
             python_version: None,
             python_executable: None,
             orateur_cli_works: false,
-            detail: "No Python 3.10+ interpreter found (tried python3, python). Install Python 3.10 or newer."
+            detail: "No Python 3.10+ interpreter found (tried python3, python). Install Python 3.10+ first — the GitHub release installer needs it."
                 .to_string(),
         });
     };
@@ -484,53 +419,27 @@ pub fn check_orateur_environment(app: AppHandle) -> Result<OrateurEnvCheck, Stri
     };
     let py_ver = String::from_utf8_lossy(&ver_out.stdout).trim().to_string();
 
-    match python_cmd_import_orateur(&py_args) {
-        Ok(out) if out.status.success() => {
-            let v = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            detail.push_str(&format!(
-                "Python {py_ver} ({py_display}): orateur import OK ({v})\n"
-            ));
-            let cli_ok = orateur_module_version(&py_args);
-            Ok(OrateurEnvCheck {
-                orateur_installed: true,
-                python_ok: true,
-                python_version: Some(py_ver),
-                python_executable: Some(py_display),
-                orateur_cli_works: cli_ok,
-                detail: detail.trim().to_string(),
-            })
-        }
-        Ok(out) if out.status.code() == Some(2) => Ok(OrateurEnvCheck {
-            orateur_installed: false,
-            python_ok: false,
-            python_version: Some(py_ver.clone()),
-            python_executable: Some(py_display.clone()),
-            orateur_cli_works: false,
-            detail: format!("Python {py_ver} is older than 3.10."),
-        }),
-        Ok(out) => {
-            let (_, err) = output_string_lossy(&out);
-            detail.push_str(&format!(
-                "Python {py_ver} ({py_display}): orateur import failed.\n{err}"
-            ));
-            Ok(OrateurEnvCheck {
-                orateur_installed: false,
-                python_ok: true,
-                python_version: Some(py_ver),
-                python_executable: Some(py_display),
-                orateur_cli_works: false,
-                detail: detail.trim().to_string(),
-            })
-        }
-        Err(e) => Ok(OrateurEnvCheck {
-            orateur_installed: false,
-            python_ok: true,
-            python_version: Some(py_ver),
-            python_executable: Some(py_display),
-            orateur_cli_works: false,
-            detail: e,
-        }),
-    }
+    let detail_fail = if cfg!(unix) {
+        format!(
+            "The `orateur` command was not found (PATH includes ~/.local/bin when possible). \
+Python {py_ver} ({py_display}) is available — required for the official installer. \
+Use the Install button to download the latest release from GitHub: the app runs curl to fetch install.sh, which creates the venv and installs the `orateur` command (same flow as the project README)."
+        )
+    } else {
+        format!(
+            "The `orateur` command was not found. Python {py_ver} is OK. \
+Use the Install button to download and install the latest Orateur wheel from GitHub (pip)."
+        )
+    };
+
+    Ok(OrateurEnvCheck {
+        orateur_installed: false,
+        python_ok: true,
+        python_version: Some(py_ver),
+        python_executable: Some(py_display),
+        orateur_cli_works: false,
+        detail: detail_fail,
+    })
 }
 
 fn install_orateur_inner(app: AppHandle) -> Result<OrateurInstallResult, String> {
