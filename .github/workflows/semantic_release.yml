@@ -18,17 +18,14 @@ jobs:
     concurrency:
       group: release
       cancel-in-progress: false
+    permissions:
+      contents: write
     steps:
-      - uses: actions/create-github-app-token@v1
-        id: app-token
-        with:
-          app-id: ${{ vars.RELEASE_GITHUB_ACTIONS_APP_ID }}
-          private-key: ${{ secrets.RELEASE_GITHUB_ACTIONS_APP_PRIVATE_KEY }}
-
+      # Uses the workflow GITHUB_TOKEN (no GitHub App). Pushes from this token do not trigger
+      # new workflow runs (GitHub limitation). Use a PAT or App if you need that.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ steps.app-token.outputs.token }}
 
       - name: Configure Git
         run: |
@@ -38,9 +35,9 @@ jobs:
       - name: Python Semantic Release
         uses: python-semantic-release/python-semantic-release@v10.5.3
         env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_TOKEN: ${{ github.token }}
           GIT_COMMIT_AUTHOR: ${{ vars.CICD_USERNAME }} <${{ vars.CICD_EMAIL }}>
         with:
-          github_token: ${{ steps.app-token.outputs.token }}
+          github_token: ${{ github.token }}
           git_committer_name: ${{ vars.CICD_USERNAME }}
           git_committer_email: ${{ vars.CICD_EMAIL }}
