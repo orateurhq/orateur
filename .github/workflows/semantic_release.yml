@@ -53,14 +53,9 @@ jobs:
       # `semantic-release version` only uploads `[tool.semantic_release] assets` (e.g. uv.lock).
       # Wheel, sdist, install.sh, quickshell tarball, and bin/orateur come from
       # `[tool.semantic_release.publish] dist_glob_patterns` and require `semantic-release publish`.
+      # `uvx` runs PSR in an isolated env (no `uv sync` — avoids torch/CUDA from project deps).
       - uses: astral-sh/setup-uv@v5
         if: steps.semantic_release.outputs.released == 'true'
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        if: steps.semantic_release.outputs.released == 'true'
-        with:
-          python-version: "3.12"
 
       - name: Publish release assets (wheel, sdist, install.sh, quickshell, launcher)
         if: steps.semantic_release.outputs.released == 'true'
@@ -68,5 +63,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           git fetch --tags origin
-          uv sync --dev
-          uv run semantic-release publish --tag "${{ steps.semantic_release.outputs.tag }}"
+          uvx --from python-semantic-release==10.5.3 semantic-release publish --tag "${{ steps.semantic_release.outputs.tag }}"
