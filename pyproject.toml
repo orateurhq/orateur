@@ -164,6 +164,7 @@ ignore_token_for_push = false
 insecure = false
 
 [tool.semantic_release.publish]
+# Applied by `semantic-release publish` (invoked after `version` in .github/workflows/semantic_release.yml).
 dist_glob_patterns = [
     "dist/*",
     "install.sh",

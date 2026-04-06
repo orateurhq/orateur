@@ -180,4 +180,6 @@ The deprecated key **`quickshell_ui_mirror`** is migrated once to **`ui_events_m
 
 ## Releasing (maintainers)
 
-Use the **[Release](.github/workflows/release.yml)** workflow so versions stay aligned across **`pyproject.toml`**, **`uv.lock`**, desktop pins, and **`install.sh`**. It runs [`scripts/sync_version_for_release.py`](scripts/sync_version_for_release.py), builds the wheel, and publishes the tag. Locally: **`python3 scripts/sync_version_for_release.py <semver>`** then **`uv lock`** and commit.
+Releases are **only** driven by **[Semantic Release](.github/workflows/semantic_release.yml)** on push to **`main`**: after verify passes, it bumps the version from [conventional commits](https://www.conventionalcommits.org/), runs [`scripts/sync_version_for_release.py`](scripts/sync_version_for_release.py) and the build in [`pyproject.toml`](pyproject.toml) (`[tool.semantic_release]`), publishes the GitHub release, and uploads the wheel, sdist, **`install.sh`**, Quickshell tarball, and launcher. Configuration lives under **`[tool.semantic_release]`** in **`pyproject.toml`**.
+
+For a one-off version sync in a branch (without cutting a release yourself), you can still run **`python3 scripts/sync_version_for_release.py <semver>`** then **`uv lock`** and commit; the automated release will apply the same steps when it runs.

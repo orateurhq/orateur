@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-# Populated by .github/workflows/release.yml for release artifacts (semver only, no "v" prefix):
+# Populated by semantic-release build (see pyproject.toml [tool.semantic_release] build_command) for release artifacts (semver only, no "v" prefix):
 DEFAULT_ORATEUR_VERSION=""
 
 ORATEUR_REPO="${ORATEUR_REPO:-orateurhq/orateur}"
