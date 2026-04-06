@@ -1,6 +1,6 @@
 [project]
 name = "orateur"
-version = "0.1.3"
+version = "0.2.0"
 description = "Minimal local speech-to-text and speech-to-speech"
 readme = "README.md"
 authors = [
