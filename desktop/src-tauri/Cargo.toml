@@ -1,6 +1,6 @@
 [package]
 name = "orateur-desktop"
-version = "0.1.3"
+version = "0.2.2"
 description = "Orateur status overlay (Tauri)"
 authors = ["Antoine"]
 edition = "2021"
