@@ -165,9 +165,13 @@ orateur languagetool stop            # stop the container
   packages split the dependencies across directories and only the wrapper knows the classpath.
 - **`languagetool_docker_image`**, **`languagetool_docker_binary`** (**`null`** = docker, then podman)
 
-The container runs as **`orateur-languagetool`** with **`--rm`**, one check thread and no caches
-(**`langtool_maxCheckThreads=1`**, **`langtool_cacheSize=0`**, **`langtool_pipelineCaching=false`**). A
+The container runs as **`orateur-languagetool`** with **`--rm`** and one check thread
+(**`langtool_maxCheckThreads=1`**, **`langtool_cacheSize=100`**, **`langtool_pipelineCaching=true`**). A
 container left behind by a crash is removed and recreated on the next start.
+
+**`pipelineCaching`** is off in LanguageTool's own defaults, which costs **1.4–2.3 s** per non-English
+check; with it on the same checks take **70–110 ms** for the same ~780 MB RSS (measured on **`fr`**,
+English is fast either way).
 
 ---
 
