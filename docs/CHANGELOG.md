@@ -1,6 +1,10 @@
 # CHANGELOG
 
 
+## v0.5.2 (2026-10-05)
+### Chores
+
+* chore(aur): update orateur-desktop-bin to 0.5.0 ([`86506f1`](https://github.com/orateurhq/orateur/commit/86506f101d2b2f08489111cdd8fa147804b5bfee))
 ## v0.5.1 (2026-10-05)
 ### Bug fixes
 
