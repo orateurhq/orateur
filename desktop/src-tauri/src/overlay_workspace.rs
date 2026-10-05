@@ -14,6 +14,8 @@ pub(crate) fn show_overlay_window<R: Runtime>(w: &WebviewWindow<R>) {
     overlay_show_on_active_workspace(w);
     #[cfg(target_os = "macos")]
     {
+        // `app_handle()` comes from `Manager`, which must be in scope alongside `ManagerExt`.
+        use tauri::Manager;
         use tauri_nspanel::ManagerExt;
         match w.app_handle().get_webview_panel(w.label()) {
             Ok(panel) => {
