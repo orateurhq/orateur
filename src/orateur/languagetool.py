@@ -94,6 +94,32 @@ def _write_server_properties() -> Optional[Path]:
         return None
 
 
+def _classpath_for_jar(jar: Path) -> str:
+    """languagetool-server.jar alone is not runnable — its dependencies sit next to it.
+
+    Distro layouts differ (Arch: /usr/share/java/languagetool/{*.jar,libs/*.jar}; the upstream
+    zip keeps everything in one directory), so put the jar, its siblings and any libs/ on the
+    classpath. `dir/*` is Java's own wildcard, expanded by the JVM, not the shell.
+    """
+    d = jar.parent
+    parts = [str(jar), str(d / "*")]
+    if (d / "libs").is_dir():
+        parts.append(str(d / "libs" / "*"))
+    return os.pathsep.join(parts)
+
+
+def _with_java_home(env: dict[str, str]) -> dict[str, str]:
+    """Distro wrapper scripts call "$JAVA_HOME/bin/java"; JAVA_HOME is often unset under systemd."""
+    if env.get("JAVA_HOME"):
+        return env
+    java = shutil.which("java")
+    if java:
+        home = Path(java).resolve().parent.parent
+        if (home / "bin" / "java").exists():
+            env["JAVA_HOME"] = str(home)
+    return env
+
+
 def _server_argv(config) -> Optional[tuple[list[str], dict[str, str]]]:
     """Command line + environment for the server, or None when LanguageTool is missing."""
     port = str(int(config.get_setting("languagetool_port", DEFAULT_PORT) or DEFAULT_PORT))
@@ -101,19 +127,32 @@ def _server_argv(config) -> Optional[tuple[list[str], dict[str, str]]]:
     props = _write_server_properties()
     env = dict(os.environ)
 
+    explicit_jar = bool(config.get_setting("languagetool_jar"))
+    wrapper = next((shutil.which(n) for n in _WRAPPER_NAMES if shutil.which(n)), None)
     jar = _find_jar(config)
-    if jar:
-        argv = ["java", f"-Xmx{heap}", "-cp", str(jar), "org.languagetool.server.HTTPServer", "--port", port]
+
+    # Prefer the distro wrapper: it knows the classpath this install needs. An explicitly
+    # configured jar wins, since that is the user pointing at a specific install.
+    if wrapper and not explicit_jar:
+        argv = [wrapper, "--http", "--port", port]
+        # The wrapper builds its own java command line; cap the heap via the JVM env.
+        env["_JAVA_OPTIONS"] = f"-Xmx{heap}"
+        env = _with_java_home(env)
+    elif jar:
         if not shutil.which("java"):
             log.warning("Found %s but no `java` in PATH; install a JRE to use LanguageTool", jar)
             return None
+        argv = [
+            "java",
+            f"-Xmx{heap}",
+            "-cp",
+            _classpath_for_jar(jar),
+            "org.languagetool.server.HTTPServer",
+            "--port",
+            port,
+        ]
     else:
-        exe = next((shutil.which(n) for n in _WRAPPER_NAMES if shutil.which(n)), None)
-        if not exe:
-            return None
-        argv = [exe, "--http", "--port", port]
-        # The wrapper scripts build their own java command line; cap the heap via the JVM env.
-        env["_JAVA_OPTIONS"] = f"-Xmx{heap}"
+        return None
     if props:
         argv += ["--config", str(props)]
     return argv, env

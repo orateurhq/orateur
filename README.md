@@ -159,6 +159,11 @@ orateur languagetool check "I has a apple"   # proofread text (or the selection/
 The server runs with **`maxCheckThreads=1`**, no caching and no **`--allow-origin`**, written to
 **`~/.cache/orateur/languagetool-server.properties`** on each start.
 
+Orateur prefers a **`languagetool`** wrapper on **`PATH`** over a bare jar, because distro packages
+split the dependencies across directories and the wrapper knows the classpath. Some distros also ship
+their own **`languagetool.service`** — enabling that instead of **`languagetool_autostart`** keeps the
+server up independently of **`orateur run`**.
+
 ---
 
 ## Systemd (user service)
