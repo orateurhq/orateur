@@ -1,6 +1,10 @@
 # CHANGELOG
 
 
+## v0.5.0 (2026-10-05)
+### Features
+
+* feat: run LanguageTool in Docker so nothing is installed on the machine ([`d99d9e4`](https://github.com/orateurhq/orateur/commit/d99d9e455289c5552e43ae64add11cb728df99b5))
 ## v0.4.1 (2026-10-05)
 ### Bug fixes
 
