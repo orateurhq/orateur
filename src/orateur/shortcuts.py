@@ -242,7 +242,19 @@ if sys.platform == "linux":
                                 for name in self.shortcuts:
                                     if not self.shortcuts[name][0].issubset(self.pressed_keys):
                                         self.active[name] = False
-                    except (OSError, IOError):
+                    except (OSError, IOError) as e:
+                        # Device went away (unplug, dock hotplug, dead endpoint). A
+                        # dead evdev fd stays permanently select()-readable, so it
+                        # must be dropped or the loop spins at 100% CPU forever.
+                        log.warning("Input device %s failed, dropping: %s", getattr(dev, "path", "?"), e)
+                        try:
+                            dev.close()
+                        except Exception:
+                            pass
+                        if dev in self.devices:
+                            self.devices.remove(dev)
+                        if not self.devices:
+                            self._discover()
                         break
 
         def start(self) -> bool:
