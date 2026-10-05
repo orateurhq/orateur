@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.5.1 (2026-10-05)
+### Bug fixes
+
+* fix: drop a dead input device instead of stalling the evdev loop ([`987b3f3`](https://github.com/orateurhq/orateur/commit/987b3f38e86e998f6a4e99dba716b0711638cd7c))### Build system
+
+* build(desktop): import tauri::Manager for the macOS NSPanel path ([`656109e`](https://github.com/orateurhq/orateur/commit/656109e38c3008072c7d7e9a744b1bac2f4e65d3))### Chores
+
+* chore: bump desktop version to 0.5.0 [skip ci] ([`6d5159b`](https://github.com/orateurhq/orateur/commit/6d5159b5f864b2f9787dea78a942bbbbe6d58dc5))
 ## v0.5.0 (2026-10-05)
 ### Features
 
