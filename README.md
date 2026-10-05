@@ -135,6 +135,32 @@ quickshell -c orateur
 
 ---
 
+## LanguageTool server (optional)
+
+Orateur can keep a local [LanguageTool HTTP server](https://dev.languagetool.org/http-server) running
+alongside it, on loopback only and with a small JVM heap. Nothing in the speech pipeline uses it yet —
+it is there so transcriptions can be proofread later.
+
+Requires Java and LanguageTool (e.g. the **`languagetool`** package, or an unpacked
+**`LanguageTool-*.zip`**; auto-detected, or point **`languagetool_jar`** at **`languagetool-server.jar`**).
+
+```bash
+orateur languagetool status          # is the server answering?
+orateur languagetool serve           # run it in the foreground
+orateur languagetool check "I has a apple"   # proofread text (or the selection/clipboard)
+```
+
+- **`languagetool_autostart`** in **`config.json`** — start the server from **`orateur run`** and stop it
+  with it (so with the systemd user service below, it starts with your session). Skipped when a server
+  already answers on the port.
+- **`languagetool_port`** (**`8081`**), **`languagetool_jar`** (**`null`** = auto-detect),
+  **`languagetool_max_heap`** (**`256m`**), **`languagetool_language`** (**`auto`**)
+
+The server runs with **`maxCheckThreads=1`**, no caching and no **`--allow-origin`**, written to
+**`~/.cache/orateur/languagetool-server.properties`** on each start.
+
+---
+
 ## Systemd (user service)
 
 Run **`orateur run`** in the background so shortcuts work without a terminal:

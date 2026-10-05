@@ -9,6 +9,7 @@ import time
 
 from . import (
     _cuda_env,  # noqa: F401 - sets LD_LIBRARY_PATH for CUDA/ROCm
+    languagetool,
     quickshell_spawn,
     ui_mirror,
 )
@@ -299,6 +300,10 @@ def run(config: ConfigManager | None = None) -> None:
     if config.get_setting("quickshell_autostart", False):
         quickshell_proc[0] = quickshell_spawn.start_quickshell()
 
+    languagetool_proc = [None]
+    if config.get_setting("languagetool_autostart", False):
+        languagetool_proc[0] = languagetool.start_languagetool(config)
+
     shutdown_requested = [False]
 
     def shutdown(sig, frame):
@@ -319,6 +324,7 @@ def run(config: ConfigManager | None = None) -> None:
         if config.get_setting("desktop_notifications", True):
             desktop_notify("Orateur stopped", "Speech shortcuts are inactive.", urgency="low")
         quickshell_spawn.stop_quickshell(quickshell_proc[0])
+        languagetool.stop_languagetool(languagetool_proc[0])
         shortcuts.stop()
         # Bypass Python interpreter shutdown to avoid C++ destructor crashes
         # (pywhispercpp/ggml and PyTorch can crash when daemon threads are

@@ -255,6 +255,25 @@ export function SettingsPanel() {
     }
   }, [config, reloadConfig]);
 
+  const saveLanguageTool = useCallback(async () => {
+    setSaveMsg(null);
+    setSaveErr(null);
+    try {
+      const jar = getStr(config, "languagetool_jar").trim();
+      await invoke("write_orateur_config_patch", {
+        patch: {
+          languagetool_autostart: getBool(config, "languagetool_autostart", false),
+          languagetool_port: getNum(config, "languagetool_port", 8081),
+          languagetool_jar: jar || null,
+        },
+      });
+      setSaveMsg("LanguageTool settings saved. Restart the speech daemon for them to take effect.");
+      void reloadConfig();
+    } catch (e) {
+      setSaveErr(e instanceof Error ? e.message : String(e));
+    }
+  }, [config, reloadConfig]);
+
   const saveSts = useCallback(async () => {
     setSaveMsg(null);
     setSaveErr(null);
@@ -455,6 +474,59 @@ export function SettingsPanel() {
               </p>
             </>
           ) : null}
+
+          <div className="settings__section">
+            <h2 className="settings__section-title">LanguageTool (optional)</h2>
+            <p className="settings__hint">
+              Runs a local <a href="https://dev.languagetool.org/http-server">LanguageTool HTTP server</a> in
+              the background with a small JVM heap. Needs Java and LanguageTool installed. Nothing uses it
+              yet — it is there so transcriptions can be proofread later. Check it with{" "}
+              <code>orateur languagetool status</code>.
+            </p>
+            <label className="settings__label settings__label--checkbox">
+              <input
+                type="checkbox"
+                checked={getBool(config, "languagetool_autostart", false)}
+                onChange={(e) => setKey("languagetool_autostart", e.target.checked)}
+              />
+              <span className="settings__checkbox-text">
+                <span className="settings__checkbox-lead">Start LanguageTool with Orateur</span>
+                <span className="settings__checkbox-sub">
+                  Spawned by <code>orateur run</code> and stopped with it. Skipped if a server already
+                  answers on the port.
+                </span>
+              </span>
+            </label>
+            <label className="settings__label">
+              Port
+              <input
+                className="settings__input"
+                type="number"
+                min={1}
+                max={65535}
+                value={String(getNum(config, "languagetool_port", 8081))}
+                onChange={(e) => setKey("languagetool_port", Number(e.target.value))}
+              />
+            </label>
+            <label className="settings__label">
+              languagetool-server.jar (optional — auto-detected when empty)
+              <input
+                className="settings__input"
+                value={getStr(config, "languagetool_jar")}
+                onChange={(e) => setKey("languagetool_jar", e.target.value)}
+                placeholder="/usr/share/languagetool/languagetool-server.jar"
+              />
+            </label>
+            <div className="settings__row">
+              <button
+                type="button"
+                className="settings__btn settings__btn--primary"
+                onClick={() => void saveLanguageTool()}
+              >
+                Save LanguageTool settings
+              </button>
+            </div>
+          </div>
 
           <div className="settings__section">
             <p className="settings__hint">Orateur CLI (Python package and launcher from GitHub Releases).</p>

@@ -317,6 +317,66 @@ def cmd_ui_send(args):
     return 0
 
 
+def cmd_languagetool_status(args):
+    """Report whether the local LanguageTool server answers."""
+    from . import languagetool
+
+    config = ConfigManager()
+    url = languagetool.base_url(config)
+    if languagetool.is_server_running(config, timeout=2.0):
+        print(f"LanguageTool running at {url}")
+        return 0
+    print(f"LanguageTool not reachable at {url}")
+    print("Start it with 'orateur languagetool serve', or set languagetool_autostart in config.json")
+    return 1
+
+
+def cmd_languagetool_serve(args):
+    """Run the LanguageTool server in the foreground until interrupted."""
+    import time as _time
+
+    from . import languagetool
+
+    config = ConfigManager()
+    proc = languagetool.start_languagetool(config, wait_ready=60.0)
+    if proc is None:
+        if languagetool.is_server_running(config, timeout=1.0):
+            logger.info("LanguageTool already running at %s", languagetool.base_url(config))
+            return 0
+        logger.error("Could not start LanguageTool")
+        return 1
+    logger.info("LanguageTool serving at %s (Ctrl+C to stop)", languagetool.base_url(config))
+    try:
+        while proc.poll() is None:
+            _time.sleep(0.3)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        languagetool.stop_languagetool(proc)
+    return 0
+
+
+def cmd_languagetool_check(args):
+    """Proofread text (arg, or selection/clipboard) and print the corrected version."""
+    from . import languagetool
+
+    config = ConfigManager()
+    text = getattr(args, "text", None) or _get_text_from_selection(config)
+    if not text:
+        logger.error("No text to check")
+        return 1
+    result = languagetool.check(text, config, language=getattr(args, "language", None))
+    if result is None:
+        logger.error("LanguageTool not reachable at %s", languagetool.base_url(config))
+        return 1
+    matches = result.get("matches") or []
+    for m in matches:
+        repl = (m.get("replacements") or [{}])[0].get("value", "")
+        print(f"  [{m.get('rule', {}).get('id', '?')}] {m.get('message', '')} -> {repl!r}")
+    print(languagetool.correct(text, config, language=getattr(args, "language", None)))
+    return 0
+
+
 def cmd_setup(args):
     """Install GPU-accelerated pywhispercpp (CUDA, Metal, or PyPI CPU)."""
     from .install_quickshell import install_quickshell
@@ -403,6 +463,14 @@ def main():
     mcp_sub.add_parser("list")
     sub.add_parser("shortcuts", help="List shortcuts")
 
+    lt_p = sub.add_parser("languagetool", help="Local LanguageTool HTTP server (optional)")
+    lt_sub = lt_p.add_subparsers(dest="languagetool_action")
+    lt_sub.add_parser("status", help="Check whether the server answers")
+    lt_sub.add_parser("serve", help="Run the server in the foreground")
+    lt_check_p = lt_sub.add_parser("check", help="Proofread text (arg, or selection/clipboard)")
+    lt_check_p.add_argument("text", nargs="?", help="Text to check")
+    lt_check_p.add_argument("--language", help="Language code (default: auto)")
+
     setup_p = sub.add_parser("setup", help="Install GPU-accelerated pywhispercpp (optional)")
     setup_p.add_argument(
         "--backend",
@@ -465,6 +533,16 @@ def main():
         return cmd_mcp_list(args)
     if args.command == "shortcuts":
         return cmd_shortcuts_list(args)
+    if args.command == "languagetool":
+        action = getattr(args, "languagetool_action", None)
+        if action == "serve":
+            return cmd_languagetool_serve(args)
+        if action == "check":
+            return cmd_languagetool_check(args)
+        if action == "status":
+            return cmd_languagetool_status(args)
+        lt_p.print_help()
+        return 0
     if args.command == "setup":
         return cmd_setup(args)
 

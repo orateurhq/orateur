@@ -31,6 +31,11 @@ export const ORATEUR_DEFAULTS: Record<string, unknown> = {
   llm_base_url: "http://localhost:11434",
   mcpServers: {},
   mcp_tools_url: null,
+  languagetool_autostart: false,
+  languagetool_port: 8081,
+  languagetool_jar: null,
+  languagetool_max_heap: "256m",
+  languagetool_language: "auto",
 };
 
 export function mergeOrateurConfig(raw: Record<string, unknown> | null | undefined): Record<string, unknown> {

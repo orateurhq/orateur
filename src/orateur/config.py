@@ -55,6 +55,14 @@ class ConfigManager:
             "quickshell_autostart": False,
             # notify-send when `orateur run` is ready / on shutdown (set false for headless).
             "desktop_notifications": True,
+            # Spawn a local LanguageTool HTTP server when `orateur run` starts (needs Java + LanguageTool).
+            "languagetool_autostart": False,
+            "languagetool_port": 8081,
+            # Path to languagetool-server.jar; null = auto-detect (jar locations, then PATH wrapper).
+            "languagetool_jar": None,
+            # JVM max heap for the server; keep small, it only proofreads short texts.
+            "languagetool_max_heap": "256m",
+            "languagetool_language": "auto",
         }
 
         self.config_dir = CONFIG_DIR
