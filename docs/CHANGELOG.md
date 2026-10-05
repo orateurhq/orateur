@@ -1,6 +1,10 @@
 # CHANGELOG
 
 
+## v0.5.3 (2026-10-05)
+### Performance improvements
+
+* perf(languagetool): enable pipeline caching ([`a3c7d52`](https://github.com/orateurhq/orateur/commit/a3c7d52d339d778440825d8b061682eeed8ab6b4))
 ## v0.5.2 (2026-10-05)
 ### Chores
 
