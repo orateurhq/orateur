@@ -264,6 +264,8 @@ export function SettingsPanel() {
         patch: {
           languagetool_autostart: getBool(config, "languagetool_autostart", false),
           languagetool_port: getNum(config, "languagetool_port", 8081),
+          languagetool_runtime: getStr(config, "languagetool_runtime") || "docker",
+          languagetool_max_heap: getStr(config, "languagetool_max_heap") || "512m",
           languagetool_jar: jar || null,
         },
       });
@@ -479,8 +481,9 @@ export function SettingsPanel() {
             <h2 className="settings__section-title">LanguageTool (optional)</h2>
             <p className="settings__hint">
               Runs a local <a href="https://dev.languagetool.org/http-server">LanguageTool HTTP server</a> in
-              the background with a small JVM heap. Needs Java and LanguageTool installed. Nothing uses it
-              yet — it is there so transcriptions can be proofread later. Check it with{" "}
+              the background, bound to loopback. By default it runs in Docker, so nothing is installed on
+              your machine — the first start pulls a ~1.2 GB image. Nothing uses it yet; it is there so
+              transcriptions can be proofread later. Check it with{" "}
               <code>orateur languagetool status</code>.
             </p>
             <label className="settings__label settings__label--checkbox">
@@ -509,14 +512,36 @@ export function SettingsPanel() {
               />
             </label>
             <label className="settings__label">
-              languagetool-server.jar (optional — auto-detected when empty)
+              Runtime
+              <select
+                className="settings__input"
+                value={getStr(config, "languagetool_runtime") || "docker"}
+                onChange={(e) => setKey("languagetool_runtime", e.target.value)}
+              >
+                <option value="docker">Docker (nothing to install)</option>
+                <option value="native">Native (LanguageTool installed on this machine)</option>
+              </select>
+            </label>
+            <label className="settings__label">
+              Max heap
               <input
                 className="settings__input"
-                value={getStr(config, "languagetool_jar")}
-                onChange={(e) => setKey("languagetool_jar", e.target.value)}
-                placeholder="/usr/share/languagetool/languagetool-server.jar"
+                value={getStr(config, "languagetool_max_heap") || "512m"}
+                onChange={(e) => setKey("languagetool_max_heap", e.target.value)}
+                placeholder="512m"
               />
             </label>
+            {getStr(config, "languagetool_runtime") === "native" ? (
+              <label className="settings__label">
+                languagetool-server.jar (optional — auto-detected when empty)
+                <input
+                  className="settings__input"
+                  value={getStr(config, "languagetool_jar")}
+                  onChange={(e) => setKey("languagetool_jar", e.target.value)}
+                  placeholder="/usr/share/java/languagetool/languagetool-server.jar"
+                />
+              </label>
+            ) : null}
             <div className="settings__row">
               <button
                 type="button"

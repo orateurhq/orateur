@@ -55,13 +55,20 @@ class ConfigManager:
             "quickshell_autostart": False,
             # notify-send when `orateur run` is ready / on shutdown (set false for headless).
             "desktop_notifications": True,
-            # Spawn a local LanguageTool HTTP server when `orateur run` starts (needs Java + LanguageTool).
+            # Start a local LanguageTool HTTP server when `orateur run` starts.
             "languagetool_autostart": False,
             "languagetool_port": 8081,
-            # Path to languagetool-server.jar; null = auto-detect (jar locations, then PATH wrapper).
+            # "docker": run the server in a container (nothing to install but Docker/Podman).
+            # "native": use a `languagetool` wrapper or jar already installed on the machine.
+            "languagetool_runtime": "docker",
+            "languagetool_docker_image": "erikvl87/languagetool:latest",
+            # null = auto-detect docker, then podman.
+            "languagetool_docker_binary": None,
+            # Native runtime only: path to languagetool-server.jar; null = auto-detect.
             "languagetool_jar": None,
-            # JVM max heap for the server; keep small, it only proofreads short texts.
-            "languagetool_max_heap": "256m",
+            # JVM max heap. 512m is the floor: 256m OOMs as soon as a non-English
+            # language loads its dictionaries (tested with fr).
+            "languagetool_max_heap": "512m",
             "languagetool_language": "auto",
         }
 

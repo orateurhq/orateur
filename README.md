@@ -135,34 +135,39 @@ quickshell -c orateur
 
 ---
 
-## LanguageTool server (optional)
+## LanguageTool server (optional, beta)
 
 Orateur can keep a local [LanguageTool HTTP server](https://dev.languagetool.org/http-server) running
-alongside it, on loopback only and with a small JVM heap. Nothing in the speech pipeline uses it yet —
-it is there so transcriptions can be proofread later.
+alongside it, bound to loopback. Nothing in the speech pipeline uses it yet — it is there so
+transcriptions can be proofread later.
 
-Requires Java and LanguageTool (e.g. the **`languagetool`** package, or an unpacked
-**`LanguageTool-*.zip`**; auto-detected, or point **`languagetool_jar`** at **`languagetool-server.jar`**).
+By default it runs in **Docker** (or Podman), so LanguageTool and its JRE are never installed on the
+machine. The first start pulls **`erikvl87/languagetool`** (~1.2 GB); after that the container starts
+in a few seconds.
 
 ```bash
-orateur languagetool status          # is the server answering?
-orateur languagetool serve           # run it in the foreground
+orateur languagetool install         # pull the image ahead of time (optional)
+orateur languagetool serve           # start it and keep it up
+orateur languagetool status          # runtime, image, container and server state
 orateur languagetool check "I has a apple"   # proofread text (or the selection/clipboard)
+orateur languagetool stop            # stop the container
 ```
 
 - **`languagetool_autostart`** in **`config.json`** — start the server from **`orateur run`** and stop it
-  with it (so with the systemd user service below, it starts with your session). Skipped when a server
-  already answers on the port.
-- **`languagetool_port`** (**`8081`**), **`languagetool_jar`** (**`null`** = auto-detect),
-  **`languagetool_max_heap`** (**`256m`**), **`languagetool_language`** (**`auto`**)
+  with it (so with the systemd user service below, it starts with your session). The first pull happens
+  on a background thread, so shortcuts stay responsive. Skipped when a server already answers on the port.
+- **`languagetool_port`** (**`8081`**, published as **`127.0.0.1:8081`** only), **`languagetool_language`**
+  (**`auto`**)
+- **`languagetool_max_heap`** (**`512m`**) — the floor: at 256m the server returns HTTP 500 with
+  **`OutOfMemoryError`** as soon as a non-English dictionary loads. The container sits around 750 MB RSS.
+- **`languagetool_runtime`** — **`docker`** (default) or **`native`** to use a **`languagetool`** wrapper
+  or jar already installed. Native prefers a wrapper on **`PATH`** over a bare jar, because distro
+  packages split the dependencies across directories and only the wrapper knows the classpath.
+- **`languagetool_docker_image`**, **`languagetool_docker_binary`** (**`null`** = docker, then podman)
 
-The server runs with **`maxCheckThreads=1`**, no caching and no **`--allow-origin`**, written to
-**`~/.cache/orateur/languagetool-server.properties`** on each start.
-
-Orateur prefers a **`languagetool`** wrapper on **`PATH`** over a bare jar, because distro packages
-split the dependencies across directories and the wrapper knows the classpath. Some distros also ship
-their own **`languagetool.service`** — enabling that instead of **`languagetool_autostart`** keeps the
-server up independently of **`orateur run`**.
+The container runs as **`orateur-languagetool`** with **`--rm`**, one check thread and no caches
+(**`langtool_maxCheckThreads=1`**, **`langtool_cacheSize=0`**, **`langtool_pipelineCaching=false`**). A
+container left behind by a crash is removed and recreated on the next start.
 
 ---
 

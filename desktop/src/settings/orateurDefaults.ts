@@ -33,8 +33,11 @@ export const ORATEUR_DEFAULTS: Record<string, unknown> = {
   mcp_tools_url: null,
   languagetool_autostart: false,
   languagetool_port: 8081,
+  languagetool_runtime: "docker",
+  languagetool_docker_image: "erikvl87/languagetool:latest",
+  languagetool_docker_binary: null,
   languagetool_jar: null,
-  languagetool_max_heap: "256m",
+  languagetool_max_heap: "512m",
   languagetool_language: "auto",
 };
 

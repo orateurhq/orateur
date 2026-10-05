@@ -300,9 +300,14 @@ def run(config: ConfigManager | None = None) -> None:
     if config.get_setting("quickshell_autostart", False):
         quickshell_proc[0] = quickshell_spawn.start_quickshell()
 
-    languagetool_proc = [None]
+    languagetool_handle = [None]
     if config.get_setting("languagetool_autostart", False):
-        languagetool_proc[0] = languagetool.start_languagetool(config)
+        # The first Docker start pulls a ~1 GB image; keep it off the main thread so
+        # shortcuts stay responsive while it downloads.
+        def _start_languagetool() -> None:
+            languagetool_handle[0] = languagetool.start_languagetool(config, wait_ready=120.0)
+
+        threading.Thread(target=_start_languagetool, name="languagetool-start", daemon=True).start()
 
     shutdown_requested = [False]
 
@@ -324,7 +329,7 @@ def run(config: ConfigManager | None = None) -> None:
         if config.get_setting("desktop_notifications", True):
             desktop_notify("Orateur stopped", "Speech shortcuts are inactive.", urgency="low")
         quickshell_spawn.stop_quickshell(quickshell_proc[0])
-        languagetool.stop_languagetool(languagetool_proc[0])
+        languagetool.stop_languagetool(languagetool_handle[0])
         shortcuts.stop()
         # Bypass Python interpreter shutdown to avoid C++ destructor crashes
         # (pywhispercpp/ggml and PyTorch can crash when daemon threads are

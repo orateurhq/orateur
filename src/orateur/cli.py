@@ -323,6 +323,16 @@ def cmd_languagetool_status(args):
 
     config = ConfigManager()
     url = languagetool.base_url(config)
+    runtime = config.get_setting("languagetool_runtime", "docker")
+    print(f"Runtime: {runtime}")
+    if runtime != "native":
+        exe = languagetool._runtime(config)
+        print(f"Container runtime: {exe or 'not found (install Docker or Podman)'}")
+        if exe:
+            image = config.get_setting("languagetool_docker_image", languagetool.DEFAULT_IMAGE)
+            print(f"Image {image}: {'present' if languagetool.image_present(config) else 'not pulled'}")
+            state = languagetool._container_state(exe, languagetool.CONTAINER_NAME)
+            print(f"Container {languagetool.CONTAINER_NAME}: {state or 'none'}")
     if languagetool.is_server_running(config, timeout=2.0):
         print(f"LanguageTool running at {url}")
         return 0
@@ -331,15 +341,41 @@ def cmd_languagetool_status(args):
     return 1
 
 
+def cmd_languagetool_install(args):
+    """Pull the LanguageTool container image so the first start is fast."""
+    from . import languagetool
+
+    config = ConfigManager()
+    if config.get_setting("languagetool_runtime", "docker") == "native":
+        logger.error("languagetool_runtime is 'native'; nothing to pull (install LanguageTool yourself)")
+        return 1
+    return 0 if languagetool.pull_image(config) else 1
+
+
+def cmd_languagetool_stop(args):
+    """Stop the LanguageTool container started by Orateur."""
+    from . import languagetool
+
+    config = ConfigManager()
+    exe = languagetool._runtime(config)
+    if not exe:
+        logger.error("No container runtime found")
+        return 1
+    handle = languagetool.Handle(kind="docker", container=languagetool.CONTAINER_NAME, runtime=exe)
+    languagetool.stop_languagetool(handle)
+    print(f"Stopped {languagetool.CONTAINER_NAME}")
+    return 0
+
+
 def cmd_languagetool_serve(args):
-    """Run the LanguageTool server in the foreground until interrupted."""
+    """Start the LanguageTool server and keep it up until interrupted."""
     import time as _time
 
     from . import languagetool
 
     config = ConfigManager()
-    proc = languagetool.start_languagetool(config, wait_ready=60.0)
-    if proc is None:
+    handle = languagetool.start_languagetool(config, wait_ready=300.0)
+    if handle is None:
         if languagetool.is_server_running(config, timeout=1.0):
             logger.info("LanguageTool already running at %s", languagetool.base_url(config))
             return 0
@@ -347,12 +383,14 @@ def cmd_languagetool_serve(args):
         return 1
     logger.info("LanguageTool serving at %s (Ctrl+C to stop)", languagetool.base_url(config))
     try:
-        while proc.poll() is None:
-            _time.sleep(0.3)
+        while True:
+            if handle.process is not None and handle.process.poll() is not None:
+                break
+            _time.sleep(0.5)
     except KeyboardInterrupt:
         pass
     finally:
-        languagetool.stop_languagetool(proc)
+        languagetool.stop_languagetool(handle)
     return 0
 
 
@@ -466,7 +504,9 @@ def main():
     lt_p = sub.add_parser("languagetool", help="Local LanguageTool HTTP server (optional)")
     lt_sub = lt_p.add_subparsers(dest="languagetool_action")
     lt_sub.add_parser("status", help="Check whether the server answers")
-    lt_sub.add_parser("serve", help="Run the server in the foreground")
+    lt_sub.add_parser("install", help="Pull the LanguageTool container image")
+    lt_sub.add_parser("serve", help="Start the server and keep it up")
+    lt_sub.add_parser("stop", help="Stop the container started by Orateur")
     lt_check_p = lt_sub.add_parser("check", help="Proofread text (arg, or selection/clipboard)")
     lt_check_p.add_argument("text", nargs="?", help="Text to check")
     lt_check_p.add_argument("--language", help="Language code (default: auto)")
@@ -537,6 +577,10 @@ def main():
         action = getattr(args, "languagetool_action", None)
         if action == "serve":
             return cmd_languagetool_serve(args)
+        if action == "install":
+            return cmd_languagetool_install(args)
+        if action == "stop":
+            return cmd_languagetool_stop(args)
         if action == "check":
             return cmd_languagetool_check(args)
         if action == "status":
