@@ -1,6 +1,10 @@
 # CHANGELOG
 
 
+## v0.4.1 (2026-10-05)
+### Bug fixes
+
+* fix: launch LanguageTool through the distro wrapper, not a bare jar ([`2309d02`](https://github.com/orateurhq/orateur/commit/2309d02b8069d9cf1e3316a17855ca17853c2bb0))
 ## v0.4.0 (2026-10-05)
 ### Features
 
