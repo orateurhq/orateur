@@ -1,6 +1,10 @@
 # CHANGELOG
 
 
+## v0.4.0 (2026-10-05)
+### Features
+
+* feat: optional local LanguageTool HTTP server ([`efb4b8a`](https://github.com/orateurhq/orateur/commit/efb4b8a07cde496c0da9e25ea49a2e0290293bdc))
 ## v0.3.0 (2026-05-18)
 ### Chores
 
